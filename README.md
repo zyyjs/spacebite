@@ -6,7 +6,22 @@
 
 ## 开始使用
 
-模型、数据格式和微调方案确定后，在此补充环境安装及训练命令。
+ByteFormer 的官方 CoreNet 源码位于 `corenet/` 子模块，其中项目配置见
+`corenet/projects/byteformer/`。
+
+首次克隆本仓库时一并获取源码：
+
+```bash
+git clone --recurse-submodules https://github.com/zyyjs/spacebite.git
+```
+
+对于已克隆的仓库，初始化或更新子模块：
+
+```bash
+git submodule update --init --recursive
+```
+
+数据格式和微调方案确定后，再补充环境安装及训练命令。
 
 ## Git 安全约定
 

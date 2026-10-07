@@ -1,0 +1,3 @@
+[submodule "corenet"]
+	path = corenet
+	url = https://github.com/apple/corenet.git
