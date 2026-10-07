@@ -21,7 +21,25 @@ git clone --recurse-submodules https://github.com/zyyjs/spacebite.git
 git submodule update --init --recursive
 ```
 
-数据格式和微调方案确定后，再补充环境安装及训练命令。
+当前服务器上的 ByteFormer 训练环境位于：
+
+```text
+/data/students/Zhang_jinsong/spacebyte/envs/byteformer
+```
+
+激活环境：
+
+```bash
+conda activate /data/students/Zhang_jinsong/spacebyte/envs/byteformer
+```
+
+也可以在仓库根目录通过 `environment.yml` 重建环境：
+
+```bash
+conda env create --file environment.yml
+```
+
+数据格式和微调方案确定后，再补充训练命令。
 
 ## Git 安全约定
 
