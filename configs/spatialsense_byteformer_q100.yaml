@@ -1,0 +1,25 @@
+paths:
+  dataset_root: /data/students/Zhang_jinsong/spacebyte/dataset/SpatialSense
+  processed_root: /data/students/Zhang_jinsong/spacebyte/processed/spatialsense_byteformer_q100
+  result_root: /data/students/Zhang_jinsong/spacebyte/result/byteformer
+  corenet_config: /home/Zhang_jinsong/spacebyte/corenet/projects/byteformer/imagenet_jpeg_q100/conv_kernel_size=8.yaml
+  pretrained_checkpoint: /data/students/Zhang_jinsong/spacebyte/models/byteformer_jpeg_q100_k8_w128/imagenet_jpeg_q100_k8_w128.pt
+
+data:
+  output_size: 224
+  jpeg_quality: 100
+  batch_size: 16
+  workers: 4
+  weighted_sampling: true
+
+training:
+  seed: 20261007
+  epochs: 25
+  head_warmup_epochs: 3
+  backbone_lr: 1.0e-5
+  head_lr: 1.0e-4
+  warmup_head_lr: 1.0e-3
+  weight_decay: 0.05
+  gradient_clip: 1.0
+  precision: bf16
+  device: cuda:0

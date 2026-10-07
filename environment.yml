@@ -8,3 +8,4 @@ dependencies:
       - --extra-index-url=https://download.pytorch.org/whl/cu121
       - -r corenet/requirements.txt
       - -e ./corenet
+      - -e .

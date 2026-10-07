@@ -54,6 +54,8 @@ wandb/
 outputs/**
 !outputs/README.md
 !outputs/**/.gitkeep
+processed/
+result/
 runs/
 checkpoints/
 logs/
