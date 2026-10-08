@@ -86,7 +86,8 @@ python scripts/train.py \
   --smoke
 ```
 
-详细设计与实验阶段见 `TRAINING_PLAN.md`。
+详细设计与实验阶段见 `TRAINING_PLAN.md`，本次完整训练和最终测试总结见
+`BYTEFORMER_SPATIALSENSE_EXPERIMENT_REPORT.md`。
 
 ## Git 安全约定
 
