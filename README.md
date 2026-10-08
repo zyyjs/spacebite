@@ -69,7 +69,8 @@ python scripts/train.py \
 python scripts/evaluate.py \
   --config configs/spatialsense_byteformer_q100.yaml \
   --checkpoint /data/students/Zhang_jinsong/spacebyte/result/byteformer/spatialsense_q100_baseline/best.pt \
-  --split test
+  --split test \
+  --output /data/students/Zhang_jinsong/spacebyte/result/byteformer/test/metrics.json
 ```
 
 训练产物包括 `metrics.jsonl`、`last.pt`、`best.pt` 和解析后的配置，统一写到

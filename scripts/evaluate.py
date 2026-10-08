@@ -10,8 +10,7 @@ import yaml
 from torch.utils.data import DataLoader
 from train import evaluate
 
-from spacebyte.data.spatialsense import (SpatialSenseByteDataset,
-                                         collate_byte_samples)
+from spacebyte.data.spatialsense import SpatialSenseByteDataset, collate_byte_samples
 from spacebyte.models import build_spatialsense_byteformer
 
 
@@ -21,6 +20,7 @@ def main() -> None:
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--split", choices=("valid", "test"), default="test")
     parser.add_argument("--device", default="cuda:0")
+    parser.add_argument("--output", type=Path)
     args = parser.parse_args()
 
     config = yaml.safe_load(args.config.read_text(encoding="utf-8"))
@@ -41,7 +41,19 @@ def main() -> None:
     device = torch.device(args.device)
     model.to(device)
     loss, metrics = evaluate(model, loader, device, config["training"]["precision"])
-    print(json.dumps({"loss": loss, "metrics": metrics}, ensure_ascii=False, indent=2))
+    report = {
+        "split": args.split,
+        "checkpoint": str(args.checkpoint.resolve()),
+        "checkpoint_epoch": checkpoint.get("epoch"),
+        "samples": len(dataset),
+        "loss": loss,
+        "metrics": metrics,
+    }
+    report_text = json.dumps(report, ensure_ascii=False, indent=2)
+    if args.output is not None:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(report_text + "\n", encoding="utf-8")
+    print(report_text)
 
 
 if __name__ == "__main__":
