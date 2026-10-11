@@ -82,6 +82,29 @@ python scripts/verify_official_byteformer.py \
 该命令只做 checkpoint 校验、严格加载和一次推理，不训练、不替换分类头、不修复 padding
 mask，也不加载任何 SpatialSense checkpoint。
 
+## Token features 与 attention mask
+
+本分支新增的 `ByteFormerTokenAdapter` 绕过官方 mean pooling 和
+`Linear(192, 1000)`，输出：
+
+```text
+features:       [B, T, 192]
+attention_mask: [B, T]，1=有效 token，0=padding token
+```
+
+官方分类头仍原样保留。最小验证命令：
+
+```bash
+python scripts/verify_byteformer_token_adapter.py \
+  --config corenet/projects/byteformer/imagenet_jpeg_q100/conv_kernel_size=8.yaml \
+  --checkpoint /data/students/Zhang_jinsong/spacebyte/models/byteformer_jpeg_q100_k8_w128/imagenet_jpeg_q100_k8_w128.pt \
+  --image-dir /path/to/jpeg-directory \
+  --device cuda:0
+```
+
+实现、源码流程、padding 问题复现和测试结果详见
+`BYTEFORMER_TOKEN_ADAPTER.md`。
+
 ## 历史资料
 
 - `TRAINING_PLAN.md`：此前 SpatialSense 九分类训练计划；
