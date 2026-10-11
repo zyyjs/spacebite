@@ -1,3 +1,6 @@
 [submodule "corenet"]
 	path = corenet
 	url = https://github.com/apple/corenet.git
+[submodule "lavis"]
+	path = lavis
+	url = https://github.com/salesforce/LAVIS.git

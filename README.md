@@ -9,7 +9,8 @@
 ## 开始使用
 
 ByteFormer 的官方 CoreNet 源码位于 `corenet/` 子模块，其中项目配置见
-`corenet/projects/byteformer/`。
+`corenet/projects/byteformer/`。X-InstructBLIP 的官方 LAVIS 源码位于 `lavis/`
+子模块，接入研究见 `X_INSTRUCTBLIP_INTEGRATION_NOTES.md`。
 
 首次克隆本仓库时一并获取源码：
 
@@ -17,7 +18,7 @@ ByteFormer 的官方 CoreNet 源码位于 `corenet/` 子模块，其中项目配
 git clone --recurse-submodules https://github.com/zyyjs/spacebite.git
 ```
 
-对于已克隆的仓库，初始化或更新子模块：
+对于已克隆的仓库，初始化或更新全部子模块：
 
 ```bash
 git submodule update --init --recursive
