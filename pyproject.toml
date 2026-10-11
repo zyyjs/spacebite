@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "spacebyte"
 version = "0.1.0"
-description = "SpatialSense fine-tuning utilities for ByteFormer"
+description = "Official pretrained ByteFormer baseline utilities"
 requires-python = ">=3.10"
 
 [tool.setuptools.packages.find]

@@ -1,95 +1,97 @@
 # Spacebyte
 
-用于模型下载、数据准备、微调、评估和推理的项目仓库。
+本分支提供 Apple 官方预训练 ByteFormer 基线的严格加载与前向验证。当前模型是
+ImageNet JPEG Q100、卷积核 `k=8`、窗口大小 `w=128` 的 ByteFormer-Tiny，保留官方
+`Linear(192, 1000)` ImageNet 分类头；不加载 SpatialSense 九分类微调权重。
 
-当前实现使用 ImageNet JPEG Q100 ByteFormer 预训练模型，在 SpatialSense 上进行
-9 类空间关系的多标签微调。每个样本由一对有序的 subject/object 构成，并只对数据集中
-实际标注的关系计算 masked binary cross-entropy。
+SpatialSense 九分类实现完整保留在分支
+`archive/byteformer-spatialsense-9cls`。本分支仍保留既有实验报告作为历史记录，但这些
+报告和外部训练产物不会被官方基线入口加载。
 
-## 开始使用
+## 源码与固定版本
 
-ByteFormer 的官方 CoreNet 源码位于 `corenet/` 子模块，其中项目配置见
-`corenet/projects/byteformer/`。X-InstructBLIP 的官方 LAVIS 源码位于 `lavis/`
-子模块，接入研究见 `X_INSTRUCTBLIP_INTEGRATION_NOTES.md`。
+- CoreNet 官方源码：`corenet/` 子模块，固定提交
+  `b205775948b27f71c55630984c42b98fff4297d9`；
+- 官方模型配置：
+  `corenet/projects/byteformer/imagenet_jpeg_q100/conv_kernel_size=8.yaml`；
+- LAVIS/X-InstructBLIP 源码：`lavis/` 子模块；
+- X-InstructBLIP 接入研究：`X_INSTRUCTBLIP_INTEGRATION_NOTES.md`。
 
-首次克隆本仓库时一并获取源码：
+首次克隆时初始化全部子模块：
 
 ```bash
 git clone --recurse-submodules https://github.com/zyyjs/spacebite.git
 ```
 
-对于已克隆的仓库，初始化或更新全部子模块：
+已克隆仓库可运行：
 
 ```bash
 git submodule update --init --recursive
 ```
 
-当前服务器上的 ByteFormer 训练环境位于：
+## 官方权重
+
+当前服务器上的官方 checkpoint：
 
 ```text
-/data/students/Zhang_jinsong/spacebyte/envs/byteformer
+/data/students/Zhang_jinsong/spacebyte/models/byteformer_jpeg_q100_k8_w128/imagenet_jpeg_q100_k8_w128.pt
 ```
 
-激活环境：
+来源：
+
+```text
+https://docs-assets.developer.apple.com/ml-research/models/cvnets-v2/multimodal_classification/imagenet_jpeg_q100_k8_w128.pt
+```
+
+SHA-256：
+
+```text
+13646ae929d20f3fb48f0a25e0a945dd59ad070746dbf651c6b2a64856867d82
+```
+
+加载器会先校验 SHA-256，然后使用 `strict=True` 加载全部 169 个 checkpoint tensor；
+不替换分类头，也不接受缺失或多余参数。
+
+## 环境
+
+服务器现有环境：
 
 ```bash
 conda activate /data/students/Zhang_jinsong/spacebyte/envs/byteformer
 ```
 
-也可以在仓库根目录通过 `environment.yml` 重建环境：
+也可从仓库配置重建：
 
 ```bash
 conda env create --file environment.yml
 ```
 
-## 数据准备
+## Forward smoke test
 
-预处理会将 subject/object 框分别绘制为红色和蓝色，将图片等比例缩放并补边到
-224×224，然后以 JPEG quality=100 保存。模型读取的是生成文件的真实 JPEG 字节，
-而不是解码后的像素张量。
-
-```bash
-python scripts/prepare_spatialsense.py \
-  --config configs/spatialsense_byteformer_q100.yaml
-
-python scripts/validate_spatialsense.py \
-  --config configs/spatialsense_byteformer_q100.yaml \
-  --output /data/students/Zhang_jinsong/spacebyte/result/byteformer/data_validation/report.json
-```
-
-## 训练与评估
-
-默认配置在 GPU 0 上使用 batch size 16、BF16、3 个 epoch 的分类头预热和 25 个
-epoch 的总训练周期：
+选择任意可读取的图像。验证入口会严格按照官方 YAML 执行验证预处理：保持长宽比将短边
+缩放到 256、中心裁剪为 224×224、转换为 tensor，再使用 PIL 重新编码为 JPEG Q100
+字节，最后送入 ByteFormer。
 
 ```bash
-python scripts/train.py \
-  --config configs/spatialsense_byteformer_q100.yaml \
-  --run-name spatialsense_q100_baseline
-
-python scripts/evaluate.py \
-  --config configs/spatialsense_byteformer_q100.yaml \
-  --checkpoint /data/students/Zhang_jinsong/spacebyte/result/byteformer/spatialsense_q100_baseline/best.pt \
-  --split test \
-  --output /data/students/Zhang_jinsong/spacebyte/result/byteformer/test/metrics.json
+python scripts/verify_official_byteformer.py \
+  --image /path/to/example.jpg \
+  --device cuda:0 \
+  --output /data/students/Zhang_jinsong/spacebyte/result/byteformer/official_baseline/smoke_test.json
 ```
 
-训练产物包括 `metrics.jsonl`、`last.pt`、`best.pt` 和解析后的配置，统一写到
-`/data/students/Zhang_jinsong/spacebyte/result/byteformer/<run-name>/`。
+该命令只做 checkpoint 校验、严格加载和一次推理，不训练、不替换分类头、不修复 padding
+mask，也不加载任何 SpatialSense checkpoint。
 
-用于快速检查安装、数据和前向/反向传播的命令：
+## 历史资料
 
-```bash
-pytest -q
-python scripts/train.py \
-  --config configs/spatialsense_byteformer_q100.yaml \
-  --processed-root /data/students/Zhang_jinsong/spacebyte/processed/spatialsense_byteformer_q100_smoke \
-  --smoke
-```
+- `TRAINING_PLAN.md`：此前 SpatialSense 九分类训练计划；
+- `IMPLEMENTATION_STATUS.md`：此前实现状态；
+- `BYTEFORMER_SPATIALSENSE_EXPERIMENT_REPORT.md`：此前实验与测试结果；
+- `X_INSTRUCTBLIP_INTEGRATION_NOTES.md`：未来接入 X-InstructBLIP 的研究笔记。
 
-详细设计与实验阶段见 `TRAINING_PLAN.md`，本次完整训练和最终测试总结见
-`BYTEFORMER_SPATIALSENSE_EXPERIMENT_REPORT.md`。
+这些文档仅作记录。九分类源代码和配置请从归档分支读取。
 
 ## Git 安全约定
 
-数据集、模型权重、训练产物、环境变量和访问令牌不得提交到仓库。需要共享的小型示例数据应先脱敏，并存放在单独的样例目录中。
+数据集、模型权重、训练产物、环境变量和访问令牌不得提交到仓库。需要共享的小型示例
+数据应先脱敏，并存放在单独的样例目录中。

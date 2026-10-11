@@ -1,5 +1,8 @@
 """Model construction helpers."""
 
-from .spatialsense_byteformer import build_spatialsense_byteformer
+from .official_byteformer import (
+    EXPECTED_CHECKPOINT_SHA256,
+    build_official_byteformer,
+)
 
-__all__ = ["build_spatialsense_byteformer"]
+__all__ = ["EXPECTED_CHECKPOINT_SHA256", "build_official_byteformer"]
