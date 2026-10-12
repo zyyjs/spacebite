@@ -105,6 +105,16 @@ python scripts/verify_byteformer_token_adapter.py \
 实现、源码流程、padding 问题复现和测试结果详见
 `BYTEFORMER_TOKEN_ADAPTER.md`。
 
+## Random Byte Q-Former bridge
+
+`ByteQFormerBridge` 将冻结 ByteFormer 的 `[B,T,192]` token features 与文本 instruction
+输入随机初始化的 12 层 LAVIS Q-Former，通过 32 个可学习 query tokens 得到
+`[B,32,768]`，再投影到 Vicuna-7B embedding 宽度 `[B,32,4096]`。本阶段仅验证结构、
+mask 和梯度传播；没有下载 BLIP-2 或 Vicuna 权重，也没有训练模型。
+
+独立环境、验证命令、参数量、显存和兼容性说明见
+`BYTE_QFORMER_BRIDGE.md`。
+
 ## 历史资料
 
 - `TRAINING_PLAN.md`：此前 SpatialSense 九分类训练计划；
