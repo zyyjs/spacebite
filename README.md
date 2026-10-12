@@ -115,6 +115,10 @@ mask 和梯度传播；没有下载 BLIP-2 或 Vicuna 权重，也没有训练�
 独立环境、验证命令、参数量、显存和兼容性说明见
 `BYTE_QFORMER_BRIDGE.md`。
 
+官方 BLIP-2 Stage-1 Q-Former 权重的逐 tensor 检查、显式键名映射、初始化工具和回归
+验证见 `BLIP2_QFORMER_INITIALIZATION.md`。该初始化只迁移语义与 shape 均匹配的
+Q-Former 参数；ByteFormer 仍冻结，Vicuna 尚未接入。
+
 ## 历史资料
 
 - `TRAINING_PLAN.md`：此前 SpatialSense 九分类训练计划；
