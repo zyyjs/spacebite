@@ -304,6 +304,7 @@ class ByteVicuna(nn.Module):
         projected_query_scale: float = 1.0,
         extra_text_padding: int = 0,
         text_padding_side: str = "right",
+        answer_only_loss: bool = False,
     ) -> ByteVicunaInputs:
         """Build exact Vicuna embeddings, masks, and optional answer labels."""
 
@@ -323,6 +324,7 @@ class ByteVicuna(nn.Module):
             projected_query_scale=projected_query_scale,
             extra_text_padding=extra_text_padding,
             text_padding_side=text_padding_side,
+            answer_only_loss=answer_only_loss,
         )
 
     def prepare_inputs_from_byte_features(
@@ -335,6 +337,7 @@ class ByteVicuna(nn.Module):
         projected_query_scale: float = 1.0,
         extra_text_padding: int = 0,
         text_padding_side: str = "right",
+        answer_only_loss: bool = False,
     ) -> ByteVicunaInputs:
         """Prepare Vicuna inputs from masked ByteFormer tokens for mask audits."""
 
@@ -358,6 +361,7 @@ class ByteVicuna(nn.Module):
             projected_query_scale=projected_query_scale,
             extra_text_padding=extra_text_padding,
             text_padding_side=text_padding_side,
+            answer_only_loss=answer_only_loss,
         )
 
     def _prepare_from_bridge_output(
@@ -371,11 +375,14 @@ class ByteVicuna(nn.Module):
         projected_query_scale: float,
         extra_text_padding: int,
         text_padding_side: str,
+        answer_only_loss: bool,
     ) -> ByteVicunaInputs:
         if text_padding_side not in {"left", "right"}:
             raise ValueError("text_padding_side must be 'left' or 'right'")
         if answers is not None and text_padding_side != "right":
             raise ValueError("The X-InstructBLIP loss path uses right padding")
+        if answer_only_loss and answers is None:
+            raise ValueError("answer_only_loss requires answer strings")
         batch_size = byte_features.shape[0]
         projected = scale_projected_queries(
             bridge_output.projected_features, projected_query_scale
@@ -419,13 +426,21 @@ class ByteVicuna(nn.Module):
                 answer_row = answer_ids[index, 1:raw_answer_length]
             answer_lengths.append(int(answer_row.numel()))
             text_rows.append(torch.cat([prompt_row, answer_row]))
+            answer_labels = answer_row.clone()
+            if answer_only_loss:
+                if (
+                    answer_batch is None
+                    or answer_batch[index] not in {"yes", "no"}
+                    or answer_row.numel() != 2
+                    or int(answer_row[-1].item()) != int(self.llm_tokenizer.eos_token_id)
+                ):
+                    raise RuntimeError(
+                        "Answer-only loss requires one yes/no token followed by EOS"
+                    )
+                answer_labels.fill_(-100)
+                answer_labels[0] = answer_row[0]
             label_rows.append(
-                torch.cat(
-                    [
-                        torch.full_like(prompt_row, -100),
-                        answer_row,
-                    ]
-                )
+                torch.cat([torch.full_like(prompt_row, -100), answer_labels])
             )
 
         text_width = max(row.numel() for row in text_rows) + extra_text_padding
@@ -514,6 +529,7 @@ class ByteVicuna(nn.Module):
         *,
         projected_query_scale: float = 1.0,
         extra_text_padding: int = 0,
+        answer_only_loss: bool = False,
     ) -> ByteVicunaOutput:
         prepared = self.prepare_inputs(
             byte_tensor,
@@ -521,6 +537,7 @@ class ByteVicuna(nn.Module):
             answers,
             projected_query_scale=projected_query_scale,
             extra_text_padding=extra_text_padding,
+            answer_only_loss=answer_only_loss,
         )
         outputs = self.vicuna(
             inputs_embeds=prepared.inputs_embeds,
@@ -544,6 +561,7 @@ class ByteVicuna(nn.Module):
         *,
         projected_query_scale: float = 1.0,
         extra_text_padding: int = 0,
+        answer_only_loss: bool = False,
     ) -> ByteVicunaOutput:
         """Differentiable loss path using cached frozen-ByteFormer outputs."""
 
@@ -554,6 +572,7 @@ class ByteVicuna(nn.Module):
             answers,
             projected_query_scale=projected_query_scale,
             extra_text_padding=extra_text_padding,
+            answer_only_loss=answer_only_loss,
         )
         outputs = self.vicuna(
             inputs_embeds=prepared.inputs_embeds,

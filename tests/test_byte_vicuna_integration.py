@@ -9,6 +9,10 @@ import pytest
 import torch
 from torch import nn
 
+from spacebyte.answer_only import (
+    assert_clean_blip2_initialization,
+    audit_answer_only_labels,
+)
 from spacebyte.models import (
     ByteQFormerBridgeOutput,
     ByteVicuna,
@@ -175,6 +179,57 @@ def test_cached_feature_forward_is_finite_and_differentiable(tiny_model) -> None
     assert all(
         parameter.grad is None for parameter in tiny_model.byteformer_adapter.parameters()
     )
+
+
+def test_answer_only_loss_has_one_causally_shifted_target(tiny_model) -> None:
+    tiny_model.eval()
+    with torch.no_grad():
+        output = tiny_model(
+            sample_bytes(),
+            ["Where?", "Where is the subject?"],
+            ["yes", "no"],
+            answer_only_loss=True,
+        )
+    audit = audit_answer_only_labels(
+        output.prepared, ["yes", "no"], tiny_model.llm_tokenizer
+    )
+    assert audit["supervised_token_count"] == 2
+    assert audit["eos_fully_ignored"]
+    manual_losses = []
+    for row in audit["rows"]:
+        label_position = row["supervised_position"]
+        target = row["token_id"] % output.logits.shape[-1]
+        manual_losses.append(
+            nn.functional.cross_entropy(
+                output.logits[row["index"], label_position - 1].unsqueeze(0),
+                torch.tensor([target]),
+            )
+        )
+        assert output.prepared.labels[row["index"], row["eos_position"]] == -100
+    assert torch.allclose(output.loss, torch.stack(manual_losses).mean(), atol=1e-6)
+
+
+def test_clean_blip2_initialization_guard() -> None:
+    clean = {
+        "bridge_checkpoint_load": None,
+        "blip2_initialization": {
+            "by_module": {
+                "query_tokens": {
+                    "loadable_tensors": 1,
+                    "target_migration_fraction": 1.0,
+                }
+            }
+        },
+    }
+    assert_clean_blip2_initialization(clean)
+    with pytest.raises(RuntimeError, match="prior bridge checkpoint"):
+        assert_clean_blip2_initialization(
+            {**clean, "bridge_checkpoint_load": {"path": "bridge_best.pt"}}
+        )
+    with pytest.raises(RuntimeError, match="Stage-1"):
+        assert_clean_blip2_initialization(
+            {"bridge_checkpoint_load": None, "blip2_initialization": {}}
+        )
 
 
 def test_frozen_modules_and_trainable_bridge(tiny_model) -> None:
