@@ -28,6 +28,7 @@ from .byte_vicuna import (
     build_xinstruct_vicuna_tokenizer,
     embedding_statistics,
     load_frozen_vicuna,
+    scale_projected_queries,
 )
 
 __all__ = [
@@ -52,4 +53,5 @@ __all__ = [
     "initialize_byte_qformer_from_blip2_stage1",
     "inspect_blip2_qformer_checkpoint",
     "load_frozen_vicuna",
+    "scale_projected_queries",
 ]

@@ -21,6 +21,12 @@ XINSTRUCT_IMAGE_CUE = "image: "
 XINSTRUCT_POSTFIX = "\nASSISTANT:"
 
 
+def scale_projected_queries(projected: Tensor, scale: float) -> Tensor:
+    """Apply the explicit Byte-prefix ablation without changing other inputs."""
+
+    return projected * scale
+
+
 @dataclass
 class ByteVicunaInputs:
     """Auditable input bundle immediately before the frozen Vicuna model."""
@@ -371,7 +377,9 @@ class ByteVicuna(nn.Module):
         if answers is not None and text_padding_side != "right":
             raise ValueError("The X-InstructBLIP loss path uses right padding")
         batch_size = byte_features.shape[0]
-        projected = bridge_output.projected_features * projected_query_scale
+        projected = scale_projected_queries(
+            bridge_output.projected_features, projected_query_scale
+        )
 
         fixed_ids, fixed_mask = self._fixed_text_prefix(batch_size)
         prompt_text = [f"{question.strip()}{XINSTRUCT_POSTFIX}" for question in question_batch]
@@ -650,6 +658,7 @@ class ByteVicuna(nn.Module):
         repetition_penalty: float = 1.0,
         length_penalty: float = 1.0,
         num_return_sequences: int = 1,
+        projected_query_scale: float = 1.0,
     ) -> tuple[list[str], Tensor, ByteVicunaInputs]:
         """Generate from cached frozen-ByteFormer outputs."""
 
@@ -658,6 +667,7 @@ class ByteVicuna(nn.Module):
             byte_features,
             byte_attention_mask,
             questions,
+            projected_query_scale=projected_query_scale,
             text_padding_side="left",
         )
         return self._generate_prepared(

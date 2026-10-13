@@ -5,6 +5,9 @@ from .spatialsense import (
     PREPROCESS_VERSION,
     RAW_RELATIONS,
     SpatialSenseCachedFeatureDataset,
+    SpatialSenseFullCachedDataset,
+    VISUAL_PREPROCESS_CONFIG,
+    atomic_torch_save,
     build_tiny_overfit_manifest,
     collate_cached_features,
     encode_marked_jpeg,
@@ -14,6 +17,9 @@ from .spatialsense import (
     parse_binary_answer,
     render_marked_image,
     resolve_image_path,
+    sha256_file,
+    validate_feature_cache_file,
+    visual_cache_identity,
 )
 
 __all__ = [
@@ -21,6 +27,9 @@ __all__ = [
     "PREPROCESS_VERSION",
     "RAW_RELATIONS",
     "SpatialSenseCachedFeatureDataset",
+    "SpatialSenseFullCachedDataset",
+    "VISUAL_PREPROCESS_CONFIG",
+    "atomic_torch_save",
     "build_tiny_overfit_manifest",
     "collate_cached_features",
     "encode_marked_jpeg",
@@ -30,4 +39,7 @@ __all__ = [
     "parse_binary_answer",
     "render_marked_image",
     "resolve_image_path",
+    "sha256_file",
+    "validate_feature_cache_file",
+    "visual_cache_identity",
 ]

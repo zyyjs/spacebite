@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import math
 from typing import Any, Sequence
 
 import torch
@@ -167,3 +168,52 @@ def supervised_token_accuracy(logits: Tensor, labels: Tensor) -> tuple[int, int]
     supervised = targets.ne(-100)
     correct = predictions.eq(targets).logical_and(supervised).sum()
     return int(correct.item()), int(supervised.sum().item())
+
+
+def warmup_cosine_multiplier(
+    scheduler_step: int, *, warmup_steps: int, total_steps: int
+) -> float:
+    """Linear warmup followed by cosine decay for a one-epoch pilot."""
+
+    if warmup_steps <= 0 or total_steps <= warmup_steps:
+        raise ValueError("Require 0 < warmup_steps < total_steps")
+    if scheduler_step < warmup_steps:
+        return (scheduler_step + 1) / warmup_steps
+    progress = min(
+        1.0, (scheduler_step - warmup_steps) / (total_steps - warmup_steps)
+    )
+    return 0.5 * (1.0 + math.cos(math.pi * progress))
+
+
+def gradient_norm_for_names(
+    module: nn.Module, predicate
+) -> float:
+    """Compute an FP32 L2 gradient norm for a named parameter subset."""
+
+    squared = 0.0
+    matched = 0
+    for name, parameter in module.named_parameters():
+        if predicate(name):
+            matched += 1
+            if parameter.grad is not None:
+                squared += float(parameter.grad.detach().float().pow(2).sum().item())
+    if not matched:
+        raise RuntimeError("Gradient audit predicate matched no parameters")
+    return squared**0.5
+
+
+def checkpoint_is_better(
+    candidate_accuracy: float,
+    candidate_auroc: float | None,
+    best_accuracy: float | None,
+    best_auroc: float | None,
+) -> bool:
+    """Select by validation likelihood accuracy, then AUROC on exact ties."""
+
+    if best_accuracy is None:
+        return True
+    if candidate_accuracy != best_accuracy:
+        return candidate_accuracy > best_accuracy
+    candidate_value = float("-inf") if candidate_auroc is None else candidate_auroc
+    best_value = float("-inf") if best_auroc is None else best_auroc
+    return candidate_value > best_value

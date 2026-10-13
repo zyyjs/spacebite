@@ -8,7 +8,9 @@ unannotated predicates are never synthesized as negative labels.
 from __future__ import annotations
 
 import io
+import hashlib
 import json
+import os
 import random
 import re
 from collections import Counter, defaultdict
@@ -57,10 +59,113 @@ QUESTION_TEMPLATE = (
     "Is the object in the red box {relation} the object in the blue box? "
     "Answer yes or no."
 )
+VISUAL_PREPROCESS_CONFIG = {
+    "output_size": 224,
+    "resize": "aspect_preserving_bicubic_letterbox",
+    "letterbox_rgb": list(LETTERBOX_COLOR),
+    "subject_rgb": list(SUBJECT_COLOR),
+    "object_rgb": list(OBJECT_COLOR),
+    "box_width": 3,
+    "bbox_order": "ymin_ymax_xmin_xmax",
+    "jpeg_quality": 100,
+    "jpeg_encoder": "PIL_unoptimized",
+    "preprocessing_version": PREPROCESS_VERSION,
+}
 
 
 def load_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(4 * 1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def visual_cache_identity(
+    record: Mapping[str, Any],
+    *,
+    raw_image_sha256: str,
+    byteformer_checkpoint_sha256: str,
+) -> tuple[str, dict[str, Any]]:
+    """Build the complete visual identity required for safe feature reuse."""
+
+    payload = {
+        "raw_image_sha256": raw_image_sha256,
+        "subject_bbox": [float(value) for value in record["subject"]["bbox"]],
+        "object_bbox": [float(value) for value in record["object"]["bbox"]],
+        "preprocessing": VISUAL_PREPROCESS_CONFIG,
+        "byteformer_checkpoint_sha256": byteformer_checkpoint_sha256,
+    }
+    canonical = json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest(), payload
+
+
+def atomic_torch_save(value: Any, path: Path) -> None:
+    """Write a torch artifact atomically in the destination directory."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}")
+    try:
+        torch.save(value, temporary)
+        with temporary.open("rb") as handle:
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
+def validate_feature_cache_file(
+    path: Path, *, expected_visual_cache_key: str | None = None
+) -> tuple[bool, str]:
+    """Detect absent, truncated, mismatched, or structurally invalid cache files."""
+
+    if not path.is_file():
+        return False, "missing"
+    try:
+        value = torch.load(path, map_location="cpu", weights_only=True)
+    except Exception as error:
+        return False, f"unreadable:{type(error).__name__}"
+    required = {
+        "visual_cache_key",
+        "byte_features",
+        "byte_attention_mask",
+        "valid_token_count",
+        "jpeg_byte_length",
+        "processed_jpeg_sha256",
+        "preprocessing_version",
+    }
+    if not isinstance(value, dict) or not required.issubset(value):
+        return False, "missing_fields"
+    if (
+        expected_visual_cache_key is not None
+        and value["visual_cache_key"] != expected_visual_cache_key
+    ):
+        return False, "cache_key_mismatch"
+    features = value["byte_features"]
+    mask = value["byte_attention_mask"]
+    if (
+        not torch.is_tensor(features)
+        or features.ndim != 2
+        or features.shape[1] != 192
+        or features.dtype != torch.float16
+    ):
+        return False, "invalid_features"
+    if not torch.is_tensor(mask) or mask.shape != features.shape[:1]:
+        return False, "invalid_mask_shape"
+    if not bool(((mask == 0) | (mask == 1)).all().item()):
+        return False, "invalid_mask_values"
+    if not bool(torch.isfinite(features).all().item()):
+        return False, "nonfinite_features"
+    if int(mask.sum().item()) != int(value["valid_token_count"]):
+        return False, "valid_token_count_mismatch"
+    return True, "valid"
 
 
 def normalize_relation(predicate: str) -> str:
@@ -332,6 +437,67 @@ class SpatialSenseCachedFeatureDataset(Dataset[dict[str, Any]]):
             "relation": record["relation"],
             "relation_raw": record["relation_raw"],
             "label": bool(record["label"]),
+            "split": record.get("split", "train"),
+        }
+
+
+class SpatialSenseFullCachedDataset(Dataset[dict[str, Any]]):
+    """Read one official split from the full annotation-to-visual-cache manifest.
+
+    The manifest deliberately has one row per annotation even when multiple
+    annotations reuse a deduplicated visual feature file.  ``expected_split``
+    is mandatory so a caller cannot silently mix train, validation, and test.
+    """
+
+    def __init__(
+        self,
+        manifest_path: Path,
+        cache_root: Path,
+        *,
+        expected_split: str,
+    ) -> None:
+        if expected_split not in {"train", "valid", "test"}:
+            raise ValueError(f"Unsupported split: {expected_split!r}")
+        rows = [
+            json.loads(line)
+            for line in manifest_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        wrong = [row["sample_id"] for row in rows if row["split"] != expected_split]
+        if wrong:
+            raise RuntimeError(
+                f"{manifest_path} contains {len(wrong)} rows outside "
+                f"the expected {expected_split!r} split"
+            )
+        sample_ids = [row["sample_id"] for row in rows]
+        if len(sample_ids) != len(set(sample_ids)):
+            raise RuntimeError(f"Duplicate sample IDs in {manifest_path}")
+        self.records = rows
+        self.cache_root = cache_root
+        self.expected_split = expected_split
+
+    def __len__(self) -> int:
+        return len(self.records)
+
+    def __getitem__(self, index: int) -> dict[str, Any]:
+        record = self.records[index]
+        path = self.cache_root / record["cache_relative_path"]
+        cached = torch.load(path, map_location="cpu", weights_only=True)
+        if cached["visual_cache_key"] != record["visual_cache_key"]:
+            raise RuntimeError(
+                f"Visual cache key mismatch for sample {record['sample_id']}"
+            )
+        return {
+            "sample_id": record["sample_id"],
+            "split": record["split"],
+            "visual_cache_key": record["visual_cache_key"],
+            "byte_features": cached["byte_features"],
+            "byte_attention_mask": cached["byte_attention_mask"].long(),
+            "question": record["question"],
+            "answer": record["answer"],
+            "relation": record["relation"],
+            "relation_raw": record["relation_raw"],
+            "label": bool(record["label"]),
         }
 
 
@@ -355,4 +521,8 @@ def collate_cached_features(batch: Sequence[Mapping[str, Any]]) -> dict[str, Any
         "questions": [item["question"] for item in batch],
         "answers": [item["answer"] for item in batch],
         "relations": [item["relation"] for item in batch],
+        "relations_raw": [item.get("relation_raw", item["relation"]) for item in batch],
+        "labels": [bool(item.get("label", item["answer"] == "yes")) for item in batch],
+        "splits": [item.get("split") for item in batch],
+        "visual_cache_keys": [item.get("visual_cache_key") for item in batch],
     }
