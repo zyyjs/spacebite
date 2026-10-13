@@ -15,6 +15,7 @@ from spacebyte.models import (
     build_xinstruct_qformer_tokenizer,
     build_xinstruct_vicuna_tokenizer,
 )
+from spacebyte.training import audit_causal_labels
 
 
 VICUNA_PATH = Path(
@@ -151,7 +152,29 @@ def test_prompt_query_and_label_shapes(tiny_model) -> None:
     for index, answer_slice in enumerate(prepared.answer_slices):
         assert prepared.labels[index, answer_slice].ne(-100).all()
     assert prepared.labels[prepared.attention_mask.eq(0)].eq(-100).all()
+    audit = audit_causal_labels(
+        prepared, ["left of", "above"], tiny_model.llm_tokenizer
+    )
+    assert audit["ignored"] + audit["supervised"] == audit["numel"]
+    assert audit["shape"] == list(prepared.attention_mask.shape)
+    assert [row["answer"] for row in audit["per_sample"]] == ["left of", "above"]
     assert torch.isfinite(output.loss)
+
+
+def test_cached_feature_forward_is_finite_and_differentiable(tiny_model) -> None:
+    tiny_model.train()
+    tiny_model.zero_grad(set_to_none=True)
+    with torch.no_grad():
+        features, mask = tiny_model.byteformer_adapter(sample_bytes()[:1])
+    output = tiny_model.forward_from_byte_features(features, mask, "Where?", "yes")
+    assert torch.isfinite(output.loss)
+    output.loss.backward()
+    assert tiny_model.bridge.query_tokens.grad is not None
+    assert tiny_model.bridge.query_tokens.grad.abs().sum() > 0
+    assert all(parameter.grad is None for parameter in tiny_model.vicuna.parameters())
+    assert all(
+        parameter.grad is None for parameter in tiny_model.byteformer_adapter.parameters()
+    )
 
 
 def test_frozen_modules_and_trainable_bridge(tiny_model) -> None:

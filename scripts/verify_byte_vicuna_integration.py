@@ -24,6 +24,7 @@ from spacebyte.models import (
     initialize_byte_qformer_from_blip2_stage1,
     load_frozen_vicuna,
 )
+from spacebyte.training import audit_causal_labels
 
 
 DEFAULT_QFORMER_TOKENIZER = Path(
@@ -402,12 +403,23 @@ def main() -> None:
     audit_labels = baseline_prepared.labels
     if audit_labels is None:
         raise RuntimeError("Label audit path did not create labels")
+    causal_label_audit = audit_causal_labels(
+        baseline_prepared, answers_pair, llm_tokenizer
+    )
     query_slice = baseline_prepared.query_slice
     text_padding_positions = baseline_prepared.attention_mask.eq(0)
     label_report = {
+        "batch_context": "separate two-sample mixed-length label audit",
         "shape": list(audit_labels.shape),
+        "numel": audit_labels.numel(),
         "ignored_count": int(audit_labels.eq(-100).sum().item()),
         "supervised_count": int(audit_labels.ne(-100).sum().item()),
+        "count_conservation": (
+            int(audit_labels.eq(-100).sum().item())
+            + int(audit_labels.ne(-100).sum().item())
+            == audit_labels.numel()
+        ),
+        "supervised_answer_eos_audit": causal_label_audit["per_sample"],
         "fixed_prefix_cue_all_ignored": bool(
             audit_labels[:, : query_slice.start].eq(-100).all().item()
         ),
@@ -466,6 +478,7 @@ def main() -> None:
                 "prompt_all_ignored",
                 "answer_all_supervised",
                 "padding_all_ignored",
+                "count_conservation",
             )
         ),
         "byte_padding_invariant": padding_checks["changed_byte_padding_content"][

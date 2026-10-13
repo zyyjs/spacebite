@@ -527,6 +527,80 @@ class ByteVicuna(nn.Module):
             prepared=prepared,
         )
 
+    def forward_from_byte_features(
+        self,
+        byte_features: Tensor,
+        byte_attention_mask: Tensor,
+        questions: str | Sequence[str],
+        answers: str | Sequence[str],
+        *,
+        projected_query_scale: float = 1.0,
+        extra_text_padding: int = 0,
+    ) -> ByteVicunaOutput:
+        """Differentiable loss path using cached frozen-ByteFormer outputs."""
+
+        prepared = self.prepare_inputs_from_byte_features(
+            byte_features,
+            byte_attention_mask,
+            questions,
+            answers,
+            projected_query_scale=projected_query_scale,
+            extra_text_padding=extra_text_padding,
+        )
+        outputs = self.vicuna(
+            inputs_embeds=prepared.inputs_embeds,
+            attention_mask=prepared.attention_mask,
+            labels=prepared.labels,
+            use_cache=False,
+            return_dict=True,
+        )
+        return ByteVicunaOutput(
+            loss=outputs.loss,
+            logits=outputs.logits,
+            prepared=prepared,
+        )
+
+    def _generate_prepared(
+        self,
+        prepared: ByteVicunaInputs,
+        *,
+        do_sample: bool,
+        num_beams: int,
+        max_length: int,
+        min_length: int,
+        top_p: float,
+        temperature: float,
+        repetition_penalty: float,
+        length_penalty: float,
+        num_return_sequences: int,
+    ) -> tuple[list[str], Tensor, ByteVicunaInputs]:
+        generated = self.vicuna.generate(
+            inputs_embeds=prepared.inputs_embeds,
+            attention_mask=prepared.attention_mask,
+            do_sample=do_sample,
+            top_p=top_p,
+            temperature=temperature,
+            num_beams=num_beams,
+            max_length=max_length,
+            min_length=min_length,
+            repetition_penalty=repetition_penalty,
+            length_penalty=length_penalty,
+            num_return_sequences=num_return_sequences,
+            use_cache=False,
+            pad_token_id=self.llm_tokenizer.pad_token_id,
+            eos_token_id=self.llm_tokenizer.eos_token_id,
+        )
+        generated = generated.masked_fill(
+            generated.eq(0), self.llm_tokenizer.eos_token_id
+        )
+        text = [
+            item.strip()
+            for item in self.llm_tokenizer.batch_decode(
+                generated, skip_special_tokens=True
+            )
+        ]
+        return text, generated, prepared
+
     @torch.no_grad()
     def generate(
         self,
@@ -547,27 +621,57 @@ class ByteVicuna(nn.Module):
         prepared = self.prepare_inputs(
             byte_tensor, questions, text_padding_side="left"
         )
-        generated = self.vicuna.generate(
-            inputs_embeds=prepared.inputs_embeds,
-            attention_mask=prepared.attention_mask,
+        return self._generate_prepared(
+            prepared,
             do_sample=do_sample,
-            top_p=top_p,
-            temperature=temperature,
             num_beams=num_beams,
             max_length=max_length,
             min_length=min_length,
+            top_p=top_p,
+            temperature=temperature,
             repetition_penalty=repetition_penalty,
             length_penalty=length_penalty,
             num_return_sequences=num_return_sequences,
-            use_cache=False,
-            pad_token_id=self.llm_tokenizer.pad_token_id,
-            eos_token_id=self.llm_tokenizer.eos_token_id,
         )
-        generated = generated.masked_fill(generated.eq(0), self.llm_tokenizer.eos_token_id)
-        text = [item.strip() for item in self.llm_tokenizer.batch_decode(
-            generated, skip_special_tokens=True
-        )]
-        return text, generated, prepared
+
+    @torch.no_grad()
+    def generate_from_byte_features(
+        self,
+        byte_features: Tensor,
+        byte_attention_mask: Tensor,
+        questions: str | Sequence[str],
+        *,
+        do_sample: bool = False,
+        num_beams: int = 5,
+        max_length: int = 30,
+        min_length: int = 1,
+        top_p: float = 0.9,
+        temperature: float = 1.0,
+        repetition_penalty: float = 1.0,
+        length_penalty: float = 1.0,
+        num_return_sequences: int = 1,
+    ) -> tuple[list[str], Tensor, ByteVicunaInputs]:
+        """Generate from cached frozen-ByteFormer outputs."""
+
+        self.eval()
+        prepared = self.prepare_inputs_from_byte_features(
+            byte_features,
+            byte_attention_mask,
+            questions,
+            text_padding_side="left",
+        )
+        return self._generate_prepared(
+            prepared,
+            do_sample=do_sample,
+            num_beams=num_beams,
+            max_length=max_length,
+            min_length=min_length,
+            top_p=top_p,
+            temperature=temperature,
+            repetition_penalty=repetition_penalty,
+            length_penalty=length_penalty,
+            num_return_sequences=num_return_sequences,
+        )
 
 
 def embedding_statistics(values: Tensor) -> dict[str, float]:

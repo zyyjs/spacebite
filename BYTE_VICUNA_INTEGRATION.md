@@ -186,9 +186,13 @@ Vicuna logits          [1,60,32001]
 
 The untrained bridge generated the non-empty decoded string `1: 1:`. This is
 only a connectivity result; no semantic quality is claimed. Causal LM loss was
-`7.0591597557`. In the two-sample label audit, 113 positions were ignored and
-7 answer/EOS positions were supervised; prefix, cue, Queries, prompt, and two
-padding positions were all correctly set to `-100`.
+`7.0591597557`. The tensor table above describes the separate single-sample
+loss run (`labels=[1,60]`). The label-count audit used a two-sample mixed-length
+batch with `labels=[2,60]`: 113 positions were ignored and 7 answer/EOS
+positions were supervised, so `113 + 7 = 120 = labels.numel()`. Prefix, cue,
+Queries, prompt, and two padding positions were all correctly set to `-100`.
+The verifier additionally asserts this conservation equation and checks each
+sample's non-`-100` token IDs against its independently tokenized answer+EOS.
 
 Changing masked Byte padding content and adding 257 right Byte-padding bytes
 both gave exactly zero logit error. Repeating identical input was also bitwise

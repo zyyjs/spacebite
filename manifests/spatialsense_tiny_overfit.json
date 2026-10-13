@@ -1,0 +1,1381 @@
+{
+  "manifest_version": 1,
+  "task": "candidate_relation_binary_generation",
+  "source_split": "train",
+  "seed": 20261013,
+  "per_relation_per_label": 2,
+  "sample_count": 36,
+  "preprocess_version": "spatialsense-red-subject-blue-object-letterbox224-jpegq100-v1",
+  "class_counts": {
+    "above": {
+      "no": 2,
+      "yes": 2
+    },
+    "behind": {
+      "no": 2,
+      "yes": 2
+    },
+    "in": {
+      "no": 2,
+      "yes": 2
+    },
+    "in front of": {
+      "no": 2,
+      "yes": 2
+    },
+    "next to": {
+      "no": 2,
+      "yes": 2
+    },
+    "on": {
+      "no": 2,
+      "yes": 2
+    },
+    "to the left of": {
+      "no": 2,
+      "yes": 2
+    },
+    "to the right of": {
+      "no": 2,
+      "yes": 2
+    },
+    "under": {
+      "no": 2,
+      "yes": 2
+    }
+  },
+  "samples": [
+    {
+      "sample_id": "5a0780fc6340130a5e687a43",
+      "image_record_index": 1509,
+      "annotation_index": 0,
+      "split": "train",
+      "image_path": "images/flickr/4960056093_9a9c782215.jpg",
+      "source_url": "https://farm5.staticflickr.com/4107/4960056093_9a9c782215.jpg",
+      "annotation_width": 500,
+      "annotation_height": 481,
+      "subject": {
+        "y": 175,
+        "x": 289,
+        "name": "horse",
+        "bbox": [
+          30.0,
+          403.0,
+          76.0,
+          435.0
+        ]
+      },
+      "object": {
+        "y": 404,
+        "x": 407,
+        "name": "dirt",
+        "bbox": [
+          155.0,
+          480.0,
+          0.0,
+          499.0
+        ]
+      },
+      "relation_raw": "above",
+      "relation": "above",
+      "label": false,
+      "answer": "no",
+      "question": "Is the object in the red box above the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a0918cb4c2481482de14545",
+      "image_record_index": 1630,
+      "annotation_index": 0,
+      "split": "train",
+      "image_path": "images/flickr/462504068_da1b94ffbc.jpg",
+      "source_url": "https://farm1.staticflickr.com/250/462504068_da1b94ffbc.jpg",
+      "annotation_width": 500,
+      "annotation_height": 400,
+      "subject": {
+        "y": 169,
+        "x": 247,
+        "name": "outer lamp",
+        "bbox": [
+          152.0,
+          184.0,
+          211.0,
+          267.0
+        ]
+      },
+      "object": {
+        "y": 217,
+        "x": 262,
+        "name": "main lamp",
+        "bbox": [
+          196.0,
+          229.0,
+          205.0,
+          303.0
+        ]
+      },
+      "relation_raw": "above",
+      "relation": "above",
+      "label": false,
+      "answer": "no",
+      "question": "Is the object in the red box above the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a091d9e4c2481482de14642",
+      "image_record_index": 7170,
+      "annotation_index": 0,
+      "split": "train",
+      "image_path": "images/flickr/3819637359_7fbbbd7f1b.jpg",
+      "source_url": "https://farm3.staticflickr.com/2666/3819637359_7fbbbd7f1b.jpg",
+      "annotation_width": 500,
+      "annotation_height": 375,
+      "subject": {
+        "y": 280,
+        "x": 307,
+        "name": "plant",
+        "bbox": [
+          269.0,
+          325.0,
+          282.0,
+          331.0
+        ]
+      },
+      "object": {
+        "y": 302,
+        "x": 82,
+        "name": "land",
+        "bbox": [
+          167.0,
+          358.0,
+          9.0,
+          151.0
+        ]
+      },
+      "relation_raw": "above",
+      "relation": "above",
+      "label": true,
+      "answer": "yes",
+      "question": "Is the object in the red box above the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a0a4e2d08a0c508fc1e6ea1",
+      "image_record_index": 1888,
+      "annotation_index": 2,
+      "split": "train",
+      "image_path": "images/nyu/nyu_bathroom_0049_r-1315326229.579178-2516702783.png",
+      "source_url": "/images/nyu/nyu_bathroom_0049_r-1315326229.579178-2516702783.png",
+      "annotation_width": 640,
+      "annotation_height": 480,
+      "subject": {
+        "y": 64,
+        "x": 367,
+        "name": "window",
+        "bbox": [
+          16.0,
+          115.0,
+          313.0,
+          412.0
+        ]
+      },
+      "object": {
+        "y": 341,
+        "x": 293,
+        "name": "tub",
+        "bbox": [
+          291.0,
+          376.0,
+          115.0,
+          364.0
+        ]
+      },
+      "relation_raw": "above",
+      "relation": "above",
+      "label": true,
+      "answer": "yes",
+      "question": "Is the object in the red box above the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "59fcb1fdf25c8070bb77ef93",
+      "image_record_index": 3414,
+      "annotation_index": 0,
+      "split": "train",
+      "image_path": "images/flickr/2940103022_7d95e99af2.jpg",
+      "source_url": "https://farm4.staticflickr.com/3154/2940103022_7d95e99af2.jpg",
+      "annotation_width": 500,
+      "annotation_height": 333,
+      "subject": {
+        "y": 242,
+        "x": 51,
+        "name": "vehicle",
+        "bbox": [
+          169.0,
+          326.0,
+          2.0,
+          161.0
+        ]
+      },
+      "object": {
+        "y": 255,
+        "x": 296,
+        "name": "woman",
+        "bbox": [
+          104.0,
+          329.0,
+          233.0,
+          346.0
+        ]
+      },
+      "relation_raw": "behind",
+      "relation": "behind",
+      "label": false,
+      "answer": "no",
+      "question": "Is the object in the red box behind the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a0841c815435218f0151b85",
+      "image_record_index": 1238,
+      "annotation_index": 0,
+      "split": "train",
+      "image_path": "images/flickr/7391315756_e1583dd777.jpg",
+      "source_url": "https://farm9.staticflickr.com/8152/7391315756_e1583dd777.jpg",
+      "annotation_width": 332,
+      "annotation_height": 500,
+      "subject": {
+        "y": 307,
+        "x": 92,
+        "name": "orange stripe",
+        "bbox": [
+          146.0,
+          354.0,
+          22.0,
+          328.0
+        ]
+      },
+      "object": {
+        "y": 284,
+        "x": 114,
+        "name": "black paint",
+        "bbox": [
+          45.0,
+          311.0,
+          50.0,
+          303.0
+        ]
+      },
+      "relation_raw": "behind",
+      "relation": "behind",
+      "label": false,
+      "answer": "no",
+      "question": "Is the object in the red box behind the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a0a774bfabd1572acbc7bfa",
+      "image_record_index": 4006,
+      "annotation_index": 0,
+      "split": "train",
+      "image_path": "images/flickr/8037773711_f1d458a647.jpg",
+      "source_url": "https://farm9.staticflickr.com/8455/8037773711_f1d458a647.jpg",
+      "annotation_width": 500,
+      "annotation_height": 459,
+      "subject": {
+        "y": 22,
+        "x": 364,
+        "name": "wall",
+        "bbox": [
+          3.0,
+          239.0,
+          202.0,
+          495.0
+        ]
+      },
+      "object": {
+        "y": 104,
+        "x": 347,
+        "name": "child",
+        "bbox": [
+          41.0,
+          421.0,
+          286.0,
+          421.0
+        ]
+      },
+      "relation_raw": "behind",
+      "relation": "behind",
+      "label": true,
+      "answer": "yes",
+      "question": "Is the object in the red box behind the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a0adad0152bbe20c32a45d6",
+      "image_record_index": 7038,
+      "annotation_index": 2,
+      "split": "train",
+      "image_path": "images/nyu/nyu_bedroom_0037_r-1315432299.031778-279678853.png",
+      "source_url": "/images/nyu/nyu_bedroom_0037_r-1315432299.031778-279678853.png",
+      "annotation_width": 640,
+      "annotation_height": 480,
+      "subject": {
+        "y": 125,
+        "x": 149,
+        "name": "man",
+        "bbox": [
+          29.0,
+          236.0,
+          111.0,
+          175.0
+        ]
+      },
+      "object": {
+        "y": 81,
+        "x": 200,
+        "name": "wall",
+        "bbox": [
+          6.0,
+          224.0,
+          180.0,
+          636.0
+        ]
+      },
+      "relation_raw": "behind",
+      "relation": "behind",
+      "label": true,
+      "answer": "yes",
+      "question": "Is the object in the red box behind the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a074fad6340130a5e6876d8",
+      "image_record_index": 4538,
+      "annotation_index": 0,
+      "split": "train",
+      "image_path": "images/flickr/30774632055_60cef521b3.jpg",
+      "source_url": "https://farm6.staticflickr.com/5554/30774632055_60cef521b3.jpg",
+      "annotation_width": 500,
+      "annotation_height": 333,
+      "subject": {
+        "y": 83,
+        "x": 454,
+        "name": "cage",
+        "bbox": [
+          2.0,
+          263.0,
+          2.0,
+          497.0
+        ]
+      },
+      "object": {
+        "y": 167,
+        "x": 203,
+        "name": "bunny",
+        "bbox": [
+          41.0,
+          298.0,
+          30.0,
+          341.0
+        ]
+      },
+      "relation_raw": "in",
+      "relation": "in",
+      "label": false,
+      "answer": "no",
+      "question": "Is the object in the red box in the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a09bf66045a685c406353d2",
+      "image_record_index": 5209,
+      "annotation_index": 0,
+      "split": "train",
+      "image_path": "images/flickr/211007188_7b87d1cf35.jpg",
+      "source_url": "https://farm1.staticflickr.com/89/211007188_7b87d1cf35.jpg",
+      "annotation_width": 500,
+      "annotation_height": 333,
+      "subject": {
+        "y": 52,
+        "x": 178,
+        "name": "person",
+        "bbox": [
+          32.0,
+          236.0,
+          153.0,
+          220.0
+        ]
+      },
+      "object": {
+        "y": 63,
+        "x": 159,
+        "name": "net",
+        "bbox": [
+          5.0,
+          181.0,
+          136.0,
+          496.0
+        ]
+      },
+      "relation_raw": "in",
+      "relation": "in",
+      "label": false,
+      "answer": "no",
+      "question": "Is the object in the red box in the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a0856aa15435218f0152b79",
+      "image_record_index": 1246,
+      "annotation_index": 1,
+      "split": "train",
+      "image_path": "images/flickr/18927518169_b1e2570b3d.jpg",
+      "source_url": "https://farm4.staticflickr.com/3817/18927518169_b1e2570b3d.jpg",
+      "annotation_width": 500,
+      "annotation_height": 375,
+      "subject": {
+        "y": 46,
+        "x": 307,
+        "name": "bunny",
+        "bbox": [
+          27.0,
+          371.0,
+          134.0,
+          408.0
+        ]
+      },
+      "object": {
+        "y": 360,
+        "x": 187,
+        "name": "glass",
+        "bbox": [
+          150.0,
+          373.0,
+          102.0,
+          401.0
+        ]
+      },
+      "relation_raw": "in",
+      "relation": "in",
+      "label": true,
+      "answer": "yes",
+      "question": "Is the object in the red box in the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a0950f94c2481482de15278",
+      "image_record_index": 5490,
+      "annotation_index": 1,
+      "split": "train",
+      "image_path": "images/flickr/4988032774_69cde0b322.jpg",
+      "source_url": "https://farm5.staticflickr.com/4107/4988032774_69cde0b322.jpg",
+      "annotation_width": 500,
+      "annotation_height": 332,
+      "subject": {
+        "y": 194,
+        "x": 202,
+        "name": "tongue",
+        "bbox": [
+          173.0,
+          222.0,
+          120.0,
+          318.0
+        ]
+      },
+      "object": {
+        "y": 239,
+        "x": 235,
+        "name": "rock",
+        "bbox": [
+          32.0,
+          295.0,
+          34.0,
+          444.0
+        ]
+      },
+      "relation_raw": "in",
+      "relation": "in",
+      "label": true,
+      "answer": "yes",
+      "question": "Is the object in the red box in the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "59fa1af0f25c8070bb77e8dc",
+      "image_record_index": 2070,
+      "annotation_index": 2,
+      "split": "train",
+      "image_path": "images/flickr/3073668837_1b12e4a23f.jpg",
+      "source_url": "https://farm4.staticflickr.com/3246/3073668837_1b12e4a23f.jpg",
+      "annotation_width": 339,
+      "annotation_height": 500,
+      "subject": {
+        "y": 167,
+        "x": 181,
+        "name": "note",
+        "bbox": [
+          132.0,
+          175.0,
+          174.0,
+          214.0
+        ]
+      },
+      "object": {
+        "y": 269,
+        "x": 165,
+        "name": "dog",
+        "bbox": [
+          181.0,
+          314.0,
+          104.0,
+          192.0
+        ]
+      },
+      "relation_raw": "in front of",
+      "relation": "in front of",
+      "label": false,
+      "answer": "no",
+      "question": "Is the object in the red box in front of the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "59fe6d5ef25c8070bb77fa55",
+      "image_record_index": 1828,
+      "annotation_index": 0,
+      "split": "train",
+      "image_path": "images/flickr/10257503186_90007e1405.jpg",
+      "source_url": "https://farm4.staticflickr.com/3708/10257503186_90007e1405.jpg",
+      "annotation_width": 500,
+      "annotation_height": 375,
+      "subject": {
+        "y": 287,
+        "x": 365,
+        "name": "wheel",
+        "bbox": [
+          251.0,
+          356.0,
+          287.0,
+          388.0
+        ]
+      },
+      "object": {
+        "y": 209,
+        "x": 321,
+        "name": "car",
+        "bbox": [
+          75.0,
+          353.0,
+          12.0,
+          494.0
+        ]
+      },
+      "relation_raw": "in front of",
+      "relation": "in front of",
+      "label": false,
+      "answer": "no",
+      "question": "Is the object in the red box in front of the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a0a235c08a0c508fc1e65d7",
+      "image_record_index": 5402,
+      "annotation_index": 0,
+      "split": "train",
+      "image_path": "images/nyu/nyu_bathroom_0031_r-1315170829.802935-1181972610.png",
+      "source_url": "/images/nyu/nyu_bathroom_0031_r-1315170829.802935-1181972610.png",
+      "annotation_width": 640,
+      "annotation_height": 480,
+      "subject": {
+        "y": 265,
+        "x": 201,
+        "name": "bath",
+        "bbox": [
+          204.0,
+          337.0,
+          88.0,
+          534.0
+        ]
+      },
+      "object": {
+        "y": 33,
+        "x": 338,
+        "name": "window",
+        "bbox": [
+          7.0,
+          93.0,
+          135.0,
+          554.0
+        ]
+      },
+      "relation_raw": "in front of",
+      "relation": "in front of",
+      "label": true,
+      "answer": "yes",
+      "question": "Is the object in the red box in front of the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a0a7815fabd1572acbc7c48",
+      "image_record_index": 4933,
+      "annotation_index": 1,
+      "split": "train",
+      "image_path": "images/flickr/7359603854_3ac608ae27.jpg",
+      "source_url": "https://farm8.staticflickr.com/7092/7359603854_3ac608ae27.jpg",
+      "annotation_width": 500,
+      "annotation_height": 333,
+      "subject": {
+        "y": 160,
+        "x": 167,
+        "name": "man",
+        "bbox": [
+          48.0,
+          332.0,
+          105.0,
+          214.0
+        ]
+      },
+      "object": {
+        "y": 140,
+        "x": 87,
+        "name": "woman",
+        "bbox": [
+          69.0,
+          313.0,
+          32.0,
+          117.0
+        ]
+      },
+      "relation_raw": "in front of",
+      "relation": "in front of",
+      "label": true,
+      "answer": "yes",
+      "question": "Is the object in the red box in front of the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "59fc7224f25c8070bb77ee20",
+      "image_record_index": 2892,
+      "annotation_index": 0,
+      "split": "train",
+      "image_path": "images/flickr/347636279_5ad2416b55.jpg",
+      "source_url": "https://farm1.staticflickr.com/128/347636279_5ad2416b55.jpg",
+      "annotation_width": 500,
+      "annotation_height": 270,
+      "subject": {
+        "y": 107,
+        "x": 42,
+        "name": "peanut butter",
+        "bbox": [
+          35.0,
+          216.0,
+          1.0,
+          104.0
+        ]
+      },
+      "object": {
+        "y": 121,
+        "x": 373,
+        "name": "tomatoes",
+        "bbox": [
+          88.0,
+          200.0,
+          327.0,
+          393.0
+        ]
+      },
+      "relation_raw": "next to",
+      "relation": "next to",
+      "label": false,
+      "answer": "no",
+      "question": "Is the object in the red box next to the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a08444215435218f0151eb8",
+      "image_record_index": 7433,
+      "annotation_index": 0,
+      "split": "train",
+      "image_path": "images/flickr/3679833236_3dbcdb9dd2.jpg",
+      "source_url": "https://farm3.staticflickr.com/2478/3679833236_3dbcdb9dd2.jpg",
+      "annotation_width": 375,
+      "annotation_height": 500,
+      "subject": {
+        "y": 264,
+        "x": 193,
+        "name": "window",
+        "bbox": [
+          182.0,
+          293.0,
+          166.0,
+          205.0
+        ]
+      },
+      "object": {
+        "y": 253,
+        "x": 248,
+        "name": "window",
+        "bbox": [
+          209.0,
+          301.0,
+          230.0,
+          265.0
+        ]
+      },
+      "relation_raw": "next to",
+      "relation": "next to",
+      "label": false,
+      "answer": "no",
+      "question": "Is the object in the red box next to the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "59ffbc7341d3c454dcfd669b",
+      "image_record_index": 2555,
+      "annotation_index": 0,
+      "split": "train",
+      "image_path": "images/flickr/14393428492_06485fea05.jpg",
+      "source_url": "https://farm4.staticflickr.com/3909/14393428492_06485fea05.jpg",
+      "annotation_width": 500,
+      "annotation_height": 297,
+      "subject": {
+        "y": 79,
+        "x": 248,
+        "name": "pole",
+        "bbox": [
+          22.0,
+          117.0,
+          246.0,
+          251.0
+        ]
+      },
+      "object": {
+        "y": 221,
+        "x": 350,
+        "name": "garden",
+        "bbox": [
+          110.0,
+          295.0,
+          32.0,
+          497.0
+        ]
+      },
+      "relation_raw": "next to",
+      "relation": "next to",
+      "label": true,
+      "answer": "yes",
+      "question": "Is the object in the red box next to the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a00320841d3c454dcfd6f73",
+      "image_record_index": 6767,
+      "annotation_index": 1,
+      "split": "train",
+      "image_path": "images/flickr/5720394117_64423569d4.jpg",
+      "source_url": "https://farm4.staticflickr.com/3174/5720394117_64423569d4.jpg",
+      "annotation_width": 500,
+      "annotation_height": 333,
+      "subject": {
+        "y": 283,
+        "x": 75,
+        "name": "guitar",
+        "bbox": [
+          170.0,
+          331.0,
+          42.0,
+          463.0
+        ]
+      },
+      "object": {
+        "y": 232,
+        "x": 148,
+        "name": "fingers",
+        "bbox": [
+          228.0,
+          282.0,
+          132.0,
+          173.0
+        ]
+      },
+      "relation_raw": "next to",
+      "relation": "next to",
+      "label": true,
+      "answer": "yes",
+      "question": "Is the object in the red box next to the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a07870d6340130a5e687a95",
+      "image_record_index": 6122,
+      "annotation_index": 0,
+      "split": "train",
+      "image_path": "images/flickr/8705707356_5098a3aef8.jpg",
+      "source_url": "https://farm9.staticflickr.com/8278/8705707356_5098a3aef8.jpg",
+      "annotation_width": 333,
+      "annotation_height": 500,
+      "subject": {
+        "y": 279,
+        "x": 237,
+        "name": "glasses",
+        "bbox": [
+          274.0,
+          287.0,
+          220.0,
+          252.0
+        ]
+      },
+      "object": {
+        "y": 332,
+        "x": 225,
+        "name": "girl",
+        "bbox": [
+          273.0,
+          446.0,
+          188.0,
+          232.0
+        ]
+      },
+      "relation_raw": "on",
+      "relation": "on",
+      "label": false,
+      "answer": "no",
+      "question": "Is the object in the red box on the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a08303a15435218f0150b56",
+      "image_record_index": 6162,
+      "annotation_index": 0,
+      "split": "train",
+      "image_path": "images/flickr/7522435108_87f68c8b91.jpg",
+      "source_url": "https://farm9.staticflickr.com/8152/7522435108_87f68c8b91.jpg",
+      "annotation_width": 500,
+      "annotation_height": 375,
+      "subject": {
+        "y": 228,
+        "x": 198,
+        "name": "tree",
+        "bbox": [
+          1.0,
+          284.0,
+          1.0,
+          355.0
+        ]
+      },
+      "object": {
+        "y": 303,
+        "x": 193,
+        "name": "car",
+        "bbox": [
+          261.0,
+          350.0,
+          78.0,
+          250.0
+        ]
+      },
+      "relation_raw": "on",
+      "relation": "on",
+      "label": false,
+      "answer": "no",
+      "question": "Is the object in the red box on the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a0a5c7208a0c508fc1e70d8",
+      "image_record_index": 4316,
+      "annotation_index": 0,
+      "split": "train",
+      "image_path": "images/nyu/nyu_living_room_0087_r-1316655364.959947-1476180190.png",
+      "source_url": "/images/nyu/nyu_living_room_0087_r-1316655364.959947-1476180190.png",
+      "annotation_width": 640,
+      "annotation_height": 480,
+      "subject": {
+        "y": 61,
+        "x": 292,
+        "name": "bike",
+        "bbox": [
+          9.0,
+          168.0,
+          187.0,
+          405.0
+        ]
+      },
+      "object": {
+        "y": 239,
+        "x": 172,
+        "name": "wall",
+        "bbox": [
+          12.0,
+          475.0,
+          2.0,
+          416.0
+        ]
+      },
+      "relation_raw": "on",
+      "relation": "on",
+      "label": true,
+      "answer": "yes",
+      "question": "Is the object in the red box on the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a0af1cb152bbe20c32a527a",
+      "image_record_index": 78,
+      "annotation_index": 0,
+      "split": "train",
+      "image_path": "images/nyu/nyu_kitchen_0008_r-1295836636.752978-3351648804.png",
+      "source_url": "/images/nyu/nyu_kitchen_0008_r-1295836636.752978-3351648804.png",
+      "annotation_width": 640,
+      "annotation_height": 480,
+      "subject": {
+        "y": 219,
+        "x": 229,
+        "name": "jar",
+        "bbox": [
+          193.0,
+          233.0,
+          215.0,
+          239.0
+        ]
+      },
+      "object": {
+        "y": 299,
+        "x": 222,
+        "name": "shelf",
+        "bbox": [
+          64.0,
+          307.0,
+          88.0,
+          268.0
+        ]
+      },
+      "relation_raw": "on",
+      "relation": "on",
+      "label": true,
+      "answer": "yes",
+      "question": "Is the object in the red box on the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a0a305308a0c508fc1e67dd",
+      "image_record_index": 4820,
+      "annotation_index": 3,
+      "split": "train",
+      "image_path": "images/nyu/nyu_bedroom_0072_r-1315179906.804121-3342136290.png",
+      "source_url": "/images/nyu/nyu_bedroom_0072_r-1315179906.804121-3342136290.png",
+      "annotation_width": 640,
+      "annotation_height": 480,
+      "subject": {
+        "y": 339,
+        "x": 433,
+        "name": "comforter",
+        "bbox": [
+          246.0,
+          358.0,
+          347.0,
+          480.0
+        ]
+      },
+      "object": {
+        "y": 323,
+        "x": 558,
+        "name": "bed",
+        "bbox": [
+          214.0,
+          446.0,
+          416.0,
+          631.0
+        ]
+      },
+      "relation_raw": "to the left of",
+      "relation": "left of",
+      "label": false,
+      "answer": "no",
+      "question": "Is the object in the red box left of the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a0abbf7152bbe20c32a2c22",
+      "image_record_index": 6141,
+      "annotation_index": 4,
+      "split": "train",
+      "image_path": "images/nyu/nyu_bedroom_0032_r-1315427334.449014-3782760322.png",
+      "source_url": "/images/nyu/nyu_bedroom_0032_r-1315427334.449014-3782760322.png",
+      "annotation_width": 640,
+      "annotation_height": 480,
+      "subject": {
+        "y": 248,
+        "x": 496,
+        "name": "chair",
+        "bbox": [
+          231.0,
+          476.0,
+          438.0,
+          565.0
+        ]
+      },
+      "object": {
+        "y": 254,
+        "x": 592,
+        "name": "table",
+        "bbox": [
+          180.0,
+          473.0,
+          288.0,
+          632.0
+        ]
+      },
+      "relation_raw": "to the left of",
+      "relation": "left of",
+      "label": false,
+      "answer": "no",
+      "question": "Is the object in the red box left of the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a07b4f26340130a5e687ccf",
+      "image_record_index": 4988,
+      "annotation_index": 0,
+      "split": "train",
+      "image_path": "images/flickr/8572406062_3bcaed0115.jpg",
+      "source_url": "https://farm9.staticflickr.com/8372/8572406062_3bcaed0115.jpg",
+      "annotation_width": 500,
+      "annotation_height": 375,
+      "subject": {
+        "y": 244,
+        "x": 248,
+        "name": "women",
+        "bbox": [
+          175.0,
+          374.0,
+          204.0,
+          301.0
+        ]
+      },
+      "object": {
+        "y": 253,
+        "x": 140,
+        "name": "women",
+        "bbox": [
+          183.0,
+          372.0,
+          94.0,
+          221.0
+        ]
+      },
+      "relation_raw": "to the left of",
+      "relation": "left of",
+      "label": true,
+      "answer": "yes",
+      "question": "Is the object in the red box left of the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a07bf116340130a5e687e7c",
+      "image_record_index": 2079,
+      "annotation_index": 1,
+      "split": "train",
+      "image_path": "images/flickr/3802620060_053b5be151.jpg",
+      "source_url": "https://farm4.staticflickr.com/3520/3802620060_053b5be151.jpg",
+      "annotation_width": 400,
+      "annotation_height": 300,
+      "subject": {
+        "y": 192,
+        "x": 275,
+        "name": "man",
+        "bbox": [
+          53.0,
+          281.0,
+          217.0,
+          354.0
+        ]
+      },
+      "object": {
+        "y": 158,
+        "x": 140,
+        "name": "man",
+        "bbox": [
+          59.0,
+          282.0,
+          31.0,
+          198.0
+        ]
+      },
+      "relation_raw": "to the left of",
+      "relation": "left of",
+      "label": true,
+      "answer": "yes",
+      "question": "Is the object in the red box left of the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a0809a215435218f014e604",
+      "image_record_index": 5668,
+      "annotation_index": 0,
+      "split": "train",
+      "image_path": "images/flickr/2664763237_2c7e3cf45e.jpg",
+      "source_url": "https://farm4.staticflickr.com/3006/2664763237_2c7e3cf45e.jpg",
+      "annotation_width": 500,
+      "annotation_height": 334,
+      "subject": {
+        "y": 321,
+        "x": 278,
+        "name": "dirt",
+        "bbox": [
+          251.0,
+          331.0,
+          2.0,
+          495.0
+        ]
+      },
+      "object": {
+        "y": 156,
+        "x": 180,
+        "name": "animal",
+        "bbox": [
+          83.0,
+          275.0,
+          78.0,
+          285.0
+        ]
+      },
+      "relation_raw": "to the right of",
+      "relation": "right of",
+      "label": false,
+      "answer": "no",
+      "question": "Is the object in the red box right of the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a0a9db9152bbe20c32a19cb",
+      "image_record_index": 5530,
+      "annotation_index": 6,
+      "split": "train",
+      "image_path": "images/nyu/nyu_living_room_0022_r-1313944853.773130-2785606668.png",
+      "source_url": "/images/nyu/nyu_living_room_0022_r-1313944853.773130-2785606668.png",
+      "annotation_width": 640,
+      "annotation_height": 480,
+      "subject": {
+        "y": 164,
+        "x": 328,
+        "name": "light",
+        "bbox": [
+          149.0,
+          169.0,
+          313.0,
+          340.0
+        ]
+      },
+      "object": {
+        "y": 248,
+        "x": 334,
+        "name": "person",
+        "bbox": [
+          212.0,
+          352.0,
+          314.0,
+          361.0
+        ]
+      },
+      "relation_raw": "to the right of",
+      "relation": "right of",
+      "label": false,
+      "answer": "no",
+      "question": "Is the object in the red box right of the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a093d254c2481482de14c18",
+      "image_record_index": 1107,
+      "annotation_index": 0,
+      "split": "train",
+      "image_path": "images/flickr/15995674995_03eb119563.jpg",
+      "source_url": "https://farm8.staticflickr.com/7472/15995674995_03eb119563.jpg",
+      "annotation_width": 500,
+      "annotation_height": 332,
+      "subject": {
+        "y": 164,
+        "x": 344,
+        "name": "woman",
+        "bbox": [
+          148.0,
+          280.0,
+          324.0,
+          366.0
+        ]
+      },
+      "object": {
+        "y": 146,
+        "x": 47,
+        "name": "sea",
+        "bbox": [
+          133.0,
+          270.0,
+          1.0,
+          266.0
+        ]
+      },
+      "relation_raw": "to the right of",
+      "relation": "right of",
+      "label": true,
+      "answer": "yes",
+      "question": "Is the object in the red box right of the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a0a661808a0c508fc1e71fd",
+      "image_record_index": 5593,
+      "annotation_index": 3,
+      "split": "train",
+      "image_path": "images/nyu/nyu_bedroom_0051_r-1315417326.068923-1112988644.png",
+      "source_url": "/images/nyu/nyu_bedroom_0051_r-1315417326.068923-1112988644.png",
+      "annotation_width": 640,
+      "annotation_height": 480,
+      "subject": {
+        "y": 180,
+        "x": 613,
+        "name": "book",
+        "bbox": [
+          149.0,
+          214.0,
+          578.0,
+          631.0
+        ]
+      },
+      "object": {
+        "y": 441,
+        "x": 434,
+        "name": "quilt",
+        "bbox": [
+          158.0,
+          472.0,
+          181.0,
+          629.0
+        ]
+      },
+      "relation_raw": "to the right of",
+      "relation": "right of",
+      "label": true,
+      "answer": "yes",
+      "question": "Is the object in the red box right of the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a0840eb15435218f0151a5c",
+      "image_record_index": 1978,
+      "annotation_index": 1,
+      "split": "train",
+      "image_path": "images/flickr/161759531_aac86e37a0.jpg",
+      "source_url": "https://farm1.staticflickr.com/73/161759531_aac86e37a0.jpg",
+      "annotation_width": 500,
+      "annotation_height": 375,
+      "subject": {
+        "y": 221,
+        "x": 192,
+        "name": "rabbit",
+        "bbox": [
+          135.0,
+          309.0,
+          100.0,
+          267.0
+        ]
+      },
+      "object": {
+        "y": 119,
+        "x": 77,
+        "name": "fence",
+        "bbox": [
+          2.0,
+          374.0,
+          2.0,
+          145.0
+        ]
+      },
+      "relation_raw": "under",
+      "relation": "under",
+      "label": false,
+      "answer": "no",
+      "question": "Is the object in the red box under the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a0ad992152bbe20c32a44e4",
+      "image_record_index": 1327,
+      "annotation_index": 0,
+      "split": "train",
+      "image_path": "images/nyu/nyu_bathroom_0043_r-1315261444.431330-1571393550.png",
+      "source_url": "/images/nyu/nyu_bathroom_0043_r-1315261444.431330-1571393550.png",
+      "annotation_width": 640,
+      "annotation_height": 480,
+      "subject": {
+        "y": 257,
+        "x": 198,
+        "name": "tap",
+        "bbox": [
+          244.0,
+          294.0,
+          183.0,
+          215.0
+        ]
+      },
+      "object": {
+        "y": 161,
+        "x": 163,
+        "name": "photo frame",
+        "bbox": [
+          127.0,
+          205.0,
+          130.0,
+          228.0
+        ]
+      },
+      "relation_raw": "under",
+      "relation": "under",
+      "label": false,
+      "answer": "no",
+      "question": "Is the object in the red box under the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a07bb6d6340130a5e687df2",
+      "image_record_index": 3525,
+      "annotation_index": 0,
+      "split": "train",
+      "image_path": "images/flickr/4898092414_d9eb2ea28b.jpg",
+      "source_url": "https://farm5.staticflickr.com/4096/4898092414_d9eb2ea28b.jpg",
+      "annotation_width": 500,
+      "annotation_height": 375,
+      "subject": {
+        "y": 222,
+        "x": 367,
+        "name": "man",
+        "bbox": [
+          98.0,
+          351.0,
+          311.0,
+          388.0
+        ]
+      },
+      "object": {
+        "y": 76,
+        "x": 216,
+        "name": "umbrella",
+        "bbox": [
+          17.0,
+          210.0,
+          185.0,
+          416.0
+        ]
+      },
+      "relation_raw": "under",
+      "relation": "under",
+      "label": true,
+      "answer": "yes",
+      "question": "Is the object in the red box under the object in the blue box? Answer yes or no."
+    },
+    {
+      "sample_id": "5a0937cb4c2481482de14a96",
+      "image_record_index": 3042,
+      "annotation_index": 0,
+      "split": "train",
+      "image_path": "images/flickr/8235133940_6e3c6c3094.jpg",
+      "source_url": "https://farm9.staticflickr.com/8064/8235133940_6e3c6c3094.jpg",
+      "annotation_width": 500,
+      "annotation_height": 423,
+      "subject": {
+        "y": 330,
+        "x": 371,
+        "name": "scarf",
+        "bbox": [
+          222.0,
+          422.0,
+          115.0,
+          449.0
+        ]
+      },
+      "object": {
+        "y": 42,
+        "x": 142,
+        "name": "monkey cap",
+        "bbox": [
+          4.0,
+          249.0,
+          88.0,
+          196.0
+        ]
+      },
+      "relation_raw": "under",
+      "relation": "under",
+      "label": true,
+      "answer": "yes",
+      "question": "Is the object in the red box under the object in the blue box? Answer yes or no."
+    }
+  ]
+}
