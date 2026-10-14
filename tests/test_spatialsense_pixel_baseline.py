@@ -17,7 +17,11 @@ from spacebyte.pixel_training import (
     PermutedPixelCachedDataset,
     SpatialSensePixelCachedDataset,
     collate_pixel_features,
+    feature_similarity_metrics,
+    feature_similarity_passes,
     pixel_visual_cache_identity,
+    require_frozen_eval,
+    validate_discrete_cache_contract,
 )
 
 
@@ -75,12 +79,18 @@ def test_pixel_cache_identity_changes_for_visual_or_weight_change() -> None:
     changed_weight, _ = pixel_visual_cache_identity(
         record, raw_image_sha256="raw", eva_checkpoint_sha256="eva2"
     )
+    changed_precision, _ = pixel_visual_cache_identity(
+        record,
+        raw_image_sha256="raw",
+        eva_checkpoint_sha256="eva",
+        cache_forward_precision="fp32",
+    )
     changed_record = {**record, "subject": {"bbox": [1, 2, 3, 5]}}
     changed_box, _ = pixel_visual_cache_identity(
         changed_record, raw_image_sha256="raw", eva_checkpoint_sha256="eva"
     )
     assert first == repeated
-    assert first not in {changed_weight, changed_box}
+    assert first not in {changed_weight, changed_box, changed_precision}
     assert payload["feature_location"].startswith("EVA-CLIP-G")
 
 
@@ -129,3 +139,86 @@ def test_cached_dataset_mapping_and_full_derangement(tmp_path: Path) -> None:
     assert batch["vision_attention_mask"].eq(1).all()
     with pytest.raises(ValueError, match="self mapping"):
         PermutedPixelCachedDataset(dataset, [0, 2, 1])
+
+
+def test_identical_features_pass_controlled_similarity() -> None:
+    value = torch.randn(2, 5, 8, dtype=torch.float16)
+    metrics = feature_similarity_metrics(value, value.clone())
+    assert metrics["torch_equal"]
+    assert metrics["max_abs_error"] == 0
+    assert feature_similarity_passes(metrics)
+
+
+def test_reasonable_fp16_difference_passes() -> None:
+    reference = torch.randn(4, 32, 64, dtype=torch.float16)
+    candidate = (reference.float() + 0.001 * torch.randn_like(reference.float())).half()
+    metrics = feature_similarity_metrics(reference, candidate)
+    assert not metrics["torch_equal"]
+    assert feature_similarity_passes(metrics)
+
+
+def test_sparse_outlier_is_reported_and_judged_by_declared_rules() -> None:
+    reference = torch.ones(1, 100, 100, dtype=torch.float16)
+    candidate = reference.clone()
+    candidate[0, 0, 0] += 1
+    metrics = feature_similarity_metrics(reference, candidate)
+    assert metrics["max_abs_error"] == 1
+    assert metrics["large_error_count"] == 1
+    assert feature_similarity_passes(metrics)
+
+
+@pytest.mark.parametrize("field", ["cache_key", "sample_id", "input_content_hash"])
+def test_discrete_cache_identity_mismatch_always_fails(field: str) -> None:
+    expected = {
+        "sample_id": "sample-a",
+        "split": "train",
+        "cache_key": "key-a",
+        "input_content_hash": "image-a",
+        "checkpoint_sha256": "weight-a",
+        "preprocessing_sha256": "preprocess-a",
+        "shape": [257, 1408],
+        "dtype": "torch.float16",
+        "attention_mask": "all_ones_length_257",
+    }
+    observed = dict(expected)
+    observed[field] = "wrong"
+    with pytest.raises(RuntimeError, match=field):
+        validate_discrete_cache_contract(observed, expected)
+
+
+def test_discrete_cache_shape_mismatch_fails() -> None:
+    expected = {"shape": [257, 1408], "dtype": "torch.float16"}
+    with pytest.raises(RuntimeError, match="shape"):
+        validate_discrete_cache_contract(
+            {"shape": [256, 1408], "dtype": "torch.float16"}, expected
+        )
+
+
+def test_large_scale_feature_error_fails() -> None:
+    reference = torch.randn(2, 32, 64, dtype=torch.float16)
+    metrics = feature_similarity_metrics(reference, -reference)
+    assert not feature_similarity_passes(metrics)
+
+
+@pytest.mark.parametrize("bad_value", [float("nan"), float("inf")])
+def test_nonfinite_feature_fails(bad_value: float) -> None:
+    reference = torch.ones(1, 8, 8, dtype=torch.float16)
+    candidate = reference.clone()
+    candidate[0, 0, 0] = bad_value
+    metrics = feature_similarity_metrics(reference, candidate)
+    assert not metrics["all_finite"]
+    assert not feature_similarity_passes(metrics)
+
+
+def test_cache_encoder_must_be_frozen_and_in_eval_mode() -> None:
+    encoder = torch.nn.Linear(2, 2)
+    encoder.requires_grad_(False)
+    encoder.eval()
+    require_frozen_eval(encoder)
+    encoder.train()
+    with pytest.raises(RuntimeError, match="eval mode"):
+        require_frozen_eval(encoder)
+    encoder.eval()
+    encoder.weight.requires_grad_(True)
+    with pytest.raises(RuntimeError, match="trainable"):
+        require_frozen_eval(encoder)

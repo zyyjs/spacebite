@@ -4,7 +4,12 @@ This experiment trains only the official InstructBLIP image bridge on the
 SpatialSense train split and selects checkpoints only on valid. EVA-CLIP-G and
 Vicuna-7B-v1.1 remain frozen. The test split is never loaded.
 
-The controller first validates or builds an audited FP16 EVA feature cache,
+The controller first validates or builds an audited EVA feature cache. Attempt 2
+uses deterministic FP32 EVA forward passes and stores the resulting tensors as
+FP16 after the original official mixed-FP16 cache showed batch-size-dependent
+outliers. Discrete sample/input/weight/preprocessing identity remains exact;
+floating comparisons use fixed mean-error, relative-L2, and per-sample cosine
+criteria.
 then trains for at most five epochs with AdamW (`lr=1e-5`), micro-batch size 1,
 gradient accumulation 8, FP16, and gradient clipping at 1.0. Every epoch it
 evaluates Normal-Pixel, Zero-Pixel, and five fixed full-validation

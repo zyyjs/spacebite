@@ -63,6 +63,10 @@ def cache_metadata_matches(
     mismatches = [
         key for key, value in expected.items() if key not in observed or observed[key] != value
     ]
-    unexpected = sorted(set(observed) - set(expected) - {"feature_shape", "created_at"})
+    unexpected = sorted(
+        set(observed)
+        - set(expected)
+        - {"feature_shape", "created_at", "generation", "validation"}
+    )
     mismatches.extend(f"unexpected:{key}" for key in unexpected)
     return not mismatches, mismatches

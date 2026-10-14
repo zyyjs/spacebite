@@ -165,6 +165,7 @@ def build_official_eva_vit_g(
     checkpoint_path: str | Path,
     *,
     source_path: str | Path | None = None,
+    mixed_fp16: bool = True,
 ) -> tuple[nn.Module, dict[str, Any]]:
     """Construct pinned EVA-CLIP-G and audit its official checkpoint load."""
 
@@ -194,7 +195,9 @@ def build_official_eva_vit_g(
     if audit["shape_mismatch"]["tensors"]:
         raise RuntimeError("Official EVA checkpoint contains shape mismatches")
     # Official LAVIS converts only convolutional and linear weights to FP16.
-    module.convert_weights_to_fp16(model)
+    # The opt-out exists solely for controlled FP32 cache diagnostics.
+    if mixed_fp16:
+        module.convert_weights_to_fp16(model)
     model.requires_grad_(False)
     model.eval()
     model.train = lambda mode=True: model
@@ -205,7 +208,7 @@ def build_official_eva_vit_g(
             "vision_width": int(model.num_features),
             "image_size": EVA_IMAGE_SIZE,
             "patch_size": EVA_PATCH_SIZE,
-            "official_mixed_fp16_conversion": True,
+            "official_mixed_fp16_conversion": mixed_fp16,
         }
     )
     return model, audit

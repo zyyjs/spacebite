@@ -50,12 +50,17 @@ from spacebyte.pixel_baseline import (
 )
 from spacebyte.pixel_training import (
     PIXEL_CACHE_VERSION,
+    PIXEL_FEATURE_THRESHOLDS,
     PermutedPixelCachedDataset,
     SpatialSensePixelCachedDataset,
     canonical_sha256,
     collate_pixel_features,
     evaluate_pixel_answer_only,
+    feature_similarity_metrics,
+    feature_similarity_passes,
     pixel_visual_cache_identity,
+    require_frozen_eval,
+    validate_discrete_cache_contract,
 )
 from spacebyte.stability_longrun import conclusion, paired_bootstrap
 
@@ -63,7 +68,7 @@ from spacebyte.stability_longrun import conclusion, paired_bootstrap
 ROOT = Path("/home/Zhang_jinsong/spacebyte")
 DATA_ROOT = Path("/data/students/Zhang_jinsong/spacebyte")
 DEFAULT_OUTPUT = DATA_ROOT / "result/pixel/spatialsense_pixel_baseline"
-DEFAULT_CACHE = DATA_ROOT / "cache/spatialsense_pixel_eva_g"
+DEFAULT_CACHE = DATA_ROOT / "cache/spatialsense_pixel_eva_g_fp32_forward"
 BYTE_REFERENCE = {
     "accuracy": 0.5364,
     "macro_f1": 0.5065,
@@ -100,6 +105,11 @@ def parse_args() -> argparse.Namespace:
         default=DATA_ROOT / "cache/spatialsense_full/manifests/valid.jsonl",
     )
     parser.add_argument("--cache-root", type=Path, default=DEFAULT_CACHE)
+    parser.add_argument(
+        "--cache-forward-precision",
+        choices=("fp32", "official_mixed_fp16"),
+        default="fp32",
+    )
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument(
         "--eva-checkpoint",
@@ -130,6 +140,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--bootstrap-iterations", type=int, default=2000)
     parser.add_argument("--smoke-steps", type=int, default=20)
     parser.add_argument("--smoke-only", action="store_true")
+    parser.add_argument("--cache-diagnostic-only", action="store_true")
     parser.add_argument("--resume", action="store_true")
     return parser.parse_args()
 
@@ -200,10 +211,14 @@ def update_status(path: Path, status: dict[str, Any], **changes: Any) -> None:
 
 
 def validate_args(args: argparse.Namespace) -> None:
+    if args.smoke_only and args.cache_diagnostic_only:
+        raise ValueError("Smoke and cache-diagnostic modes are mutually exclusive")
     if args.gradient_accumulation != 8 or args.smoke_steps != 20:
         raise ValueError("The experiment fixes accumulation=8 and smoke optimizer steps=20")
     if args.max_epochs != 5 or args.learning_rate != 1e-5 or args.gradient_clipping != 1.0:
         raise ValueError("The fixed Pixel baseline hyperparameters were changed")
+    if args.cache_forward_precision != "fp32":
+        raise ValueError("Attempt 2 requires FP32 EVA cache forward with FP16 storage")
     if not args.device.startswith("cuda") or not torch.cuda.is_available():
         raise RuntimeError("Pixel baseline requires FP16 CUDA execution")
     required = [
@@ -281,6 +296,7 @@ def prepare_cache_rows(
                 record,
                 raw_image_sha256=image_hashes[image_path],
                 eva_checkpoint_sha256=eva_sha256,
+                cache_forward_precision=args.cache_forward_precision,
             )
             identities.setdefault(key, {"record": record, "payload": payload})
             rows[split].append(
@@ -321,6 +337,7 @@ def expected_cache_metadata(
         "unique_feature_count": len(identities),
         "preprocessing": VISUAL_PREPROCESS_CONFIG,
         "dtype": "torch.float16",
+        "cache_forward_precision": args.cache_forward_precision,
         "test_split_used": False,
     }
 
@@ -333,6 +350,7 @@ def cache_is_reusable(
     args: argparse.Namespace,
     expected: dict[str, Any],
     rows: dict[str, list[dict[str, Any]]],
+    identities: dict[str, dict[str, Any]],
 ) -> tuple[bool, dict[str, Any]]:
     metadata_path = args.cache_root / "cache_metadata.json"
     if not metadata_path.is_file():
@@ -358,53 +376,383 @@ def cache_is_reusable(
         except Exception as error:
             return False, {"reason": "feature_unreadable", "key": key, "error": str(error)}
         feature = artifact.get("vision_features")
+        identity = identities[key]
         if (
             artifact.get("pixel_cache_key") != key
+            or artifact.get("representative_sample_id")
+            != identity["record"]["sample_id"]
+            or artifact.get("identity_payload") != identity["payload"]
             or not torch.is_tensor(feature)
             or feature.dtype != torch.float16
             or tuple(feature.shape) != feature_shape
             or not bool(torch.isfinite(feature).all().item())
         ):
             return False, {"reason": "feature_invalid", "key": key}
-    return True, {"reason": "exact_metadata_manifest_and_feature_match"}
+    return True, {
+        "reason": "exact_metadata_manifest_identity_and_feature_match",
+        "strict_feature_artifacts_checked": len(unique),
+    }
 
 
-@torch.no_grad()
-def online_cache_checks(
+def _cache_artifact(args: argparse.Namespace, key: str) -> dict[str, Any]:
+    return torch.load(
+        args.cache_root / "features" / key[:2] / f"{key}.pt",
+        map_location="cpu",
+        weights_only=True,
+    )
+
+
+def _diagnostic_batch_indices(
+    pending: list[tuple[str, dict[str, Any]]], batch_size: int
+) -> list[int]:
+    total = math.ceil(len(pending) / batch_size)
+    first_valid = next(
+        index for index, (_key, item) in enumerate(pending) if item["record"]["split"] == "valid"
+    )
+    requested = [
+        0,
+        1,
+        total // 3,
+        total // 2,
+        max(0, first_valid // batch_size - 1),
+        first_valid // batch_size,
+        max(0, total - 2),
+        total - 1,
+    ]
+    selected = []
+    for index in requested:
+        if 0 <= index < total and index not in selected:
+            selected.append(index)
+    if sum(len(pending[index * batch_size : (index + 1) * batch_size]) for index in selected) < 32:
+        raise RuntimeError("Controlled cache diagnostic selected fewer than 32 samples")
+    return selected
+
+
+def _cache_precision_forward(
+    visual_encoder: torch.nn.Module,
+    pixels: torch.Tensor,
+    precision: str,
+) -> torch.Tensor:
+    if precision == "fp32":
+        with torch.autocast(device_type="cuda", enabled=False):
+            return visual_encoder(pixels.float()).half()
+    if precision == "official_mixed_fp16":
+        with torch.autocast(device_type="cuda", dtype=torch.float16):
+            return visual_encoder(pixels).half()
+    raise ValueError(f"Unsupported cache forward precision: {precision}")
+
+
+@torch.inference_mode()
+def controlled_cache_diagnostics(
     args: argparse.Namespace,
     visual_encoder: torch.nn.Module,
-    rows: dict[str, list[dict[str, Any]]],
-    records: dict[str, list[dict[str, Any]]],
+    identities: dict[str, dict[str, Any]],
+    eva_sha256: str,
     device: torch.device,
 ) -> dict[str, Any]:
-    checks = []
-    for split in ("train", "valid"):
-        for index in (0, len(records[split]) // 2, len(records[split]) - 1):
-            marked = render_record_to_pixel_values(args.dataset_root, records[split][index])
-            pixels = marked.pixel_values.unsqueeze(0).to(device)
-            with torch.autocast(device_type="cuda", dtype=torch.float16):
-                online = visual_encoder(pixels)[0].half().cpu()
-            row = rows[split][index]
-            artifact = torch.load(
-                args.cache_root / row["feature_relative_path"],
-                map_location="cpu",
-                weights_only=True,
-            )
-            cached = artifact["vision_features"]
-            delta = (online.float() - cached.float()).abs()
-            checks.append(
+    """Replay cache batches, compare batch paths, FP32, and downstream bridge."""
+
+    require_frozen_eval(visual_encoder)
+    pending = list(identities.items())
+    batch_indices = _diagnostic_batch_indices(pending, args.cache_batch_size)
+    selected: list[dict[str, Any]] = []
+    same_batch_rows = []
+    same_cached = []
+    same_replayed = []
+    preprocessing_sha = canonical_sha256(
+        {
+            "marked_jpeg_preprocessing": VISUAL_PREPROCESS_CONFIG,
+            "pixel_normalization": pending[0][1]["payload"]["pixel_normalization"],
+        }
+    )
+
+    for batch_index in batch_indices:
+        start = batch_index * args.cache_batch_size
+        batch = pending[start : start + args.cache_batch_size]
+        marked = [
+            render_record_to_pixel_values(args.dataset_root, item["record"])
+            for _key, item in batch
+        ]
+        pixels = torch.stack([value.pixel_values for value in marked]).to(device)
+        replayed = _cache_precision_forward(
+            visual_encoder, pixels, args.cache_forward_precision
+        ).cpu()
+        cached = torch.stack(
+            [_cache_artifact(args, key)["vision_features"] for key, _item in batch]
+        )
+        metrics = feature_similarity_metrics(cached, replayed)
+        same_batch_rows.append(
+            {
+                "batch_index": batch_index,
+                "batch_size": len(batch),
+                "metrics": metrics,
+            }
+        )
+        same_cached.append(cached)
+        same_replayed.append(replayed)
+        for position, ((key, identity), marked_input) in enumerate(zip(batch, marked)):
+            artifact = _cache_artifact(args, key)
+            processed_sha = hashlib.sha256(
+                marked_input.jpeg_bytes.to(torch.uint8).numpy().tobytes()
+            ).hexdigest()
+            observed = {
+                "sample_id": artifact.get("representative_sample_id"),
+                "split": identity["record"]["split"],
+                "cache_key": artifact.get("pixel_cache_key"),
+                "input_content_hash": artifact.get("processed_jpeg_sha256"),
+                "checkpoint_sha256": artifact.get("identity_payload", {}).get(
+                    "eva_checkpoint_sha256"
+                ),
+                "preprocessing_sha256": canonical_sha256(
+                    {
+                        "marked_jpeg_preprocessing": artifact.get("identity_payload", {}).get(
+                            "marked_jpeg_preprocessing"
+                        ),
+                        "pixel_normalization": artifact.get("identity_payload", {}).get(
+                            "pixel_normalization"
+                        ),
+                    }
+                ),
+                "shape": list(artifact["vision_features"].shape),
+                "dtype": str(artifact["vision_features"].dtype),
+                "attention_mask": f"all_ones_length_{artifact['vision_features'].shape[0]}",
+            }
+            expected = {
+                "sample_id": identity["record"]["sample_id"],
+                "split": identity["record"]["split"],
+                "cache_key": key,
+                "input_content_hash": processed_sha,
+                "checkpoint_sha256": eva_sha256,
+                "preprocessing_sha256": preprocessing_sha,
+                "shape": list(cached[position].shape),
+                "dtype": "torch.float16",
+                "attention_mask": f"all_ones_length_{cached.shape[1]}",
+            }
+            validate_discrete_cache_contract(observed, expected)
+            selected.append(
                 {
-                    "sample_id": row["sample_id"],
-                    "split": split,
-                    "cache_key_matches": artifact["pixel_cache_key"] == row["pixel_cache_key"],
-                    "shape": list(cached.shape),
-                    "max_abs_error": float(delta.max().item()),
-                    "mean_abs_error": float(delta.mean().item()),
+                    "key": key,
+                    "identity": identity,
+                    "batch_index": batch_index,
+                    "batch_position": position,
+                    "batch_size": len(batch),
+                    "cached": cached[position],
+                    "replayed": replayed[position],
+                    "pixels": marked_input.pixel_values,
                 }
             )
-    if any(not row["cache_key_matches"] or row["max_abs_error"] != 0 for row in checks):
-        raise RuntimeError(f"Online/cache feature audit failed: {checks}")
-    return {"sample_count": len(checks), "all_exact_fp16": True, "samples": checks}
+
+    same_metrics = feature_similarity_metrics(
+        torch.cat(same_cached), torch.cat(same_replayed)
+    )
+    if not same_metrics["torch_equal"]:
+        raise RuntimeError(
+            f"Same-batch cache-precision replay was not exact: {same_metrics}"
+        )
+
+    online_single = []
+    for item in selected:
+        pixels = item["pixels"].unsqueeze(0).to(device)
+        online_single.append(
+            _cache_precision_forward(
+                visual_encoder, pixels, args.cache_forward_precision
+            )[0].cpu()
+        )
+    cached_selected = torch.stack([item["cached"] for item in selected])
+    online_selected = torch.stack(online_single)
+    cross_batch_metrics = feature_similarity_metrics(cached_selected, online_selected)
+    cross_batch_passed = feature_similarity_passes(cross_batch_metrics)
+
+    failed_exact = [
+        (index, item)
+        for index, item in enumerate(selected)
+        if not torch.equal(item["cached"], online_selected[index]) and item["batch_size"] == 8
+    ]
+    if len(failed_exact) < 6:
+        failed_exact = [
+            (index, item)
+            for index, item in enumerate(selected)
+            if item["batch_size"] == 8
+        ]
+    if len(failed_exact) < 6:
+        raise RuntimeError("Fewer than six full-batch samples for FP32 diagnosis")
+    fp32_targets = failed_exact[:6]
+    if args.cache_forward_precision == "fp32":
+        fp32_encoder = visual_encoder
+        fp32_audit = {
+            "shape_mismatch": {"tensors": 0, "parameters": 0},
+            "official_mixed_fp16_conversion": False,
+        }
+    else:
+        visual_encoder.cpu()
+        torch.cuda.empty_cache()
+        fp32_encoder, fp32_audit = build_official_eva_vit_g(
+            args.eva_checkpoint, mixed_fp16=False
+        )
+        fp32_encoder.to(device).eval()
+        require_frozen_eval(fp32_encoder)
+    fp32_batch_outputs: dict[int, torch.Tensor] = {}
+    for batch_index in sorted({item["batch_index"] for _index, item in fp32_targets}):
+        batch = pending[
+            batch_index * args.cache_batch_size : (batch_index + 1) * args.cache_batch_size
+        ]
+        pixels = torch.stack(
+            [
+                render_record_to_pixel_values(args.dataset_root, identity["record"]).pixel_values
+                for _key, identity in batch
+            ]
+        ).to(device)
+        with torch.autocast(device_type="cuda", enabled=False):
+            fp32_batch_outputs[batch_index] = fp32_encoder(pixels.float()).cpu()
+    fp32_batch = []
+    fp32_single = []
+    fp32_samples = []
+    for _selected_index, item in fp32_targets:
+        with torch.autocast(device_type="cuda", enabled=False):
+            single = fp32_encoder(item["pixels"].unsqueeze(0).to(device).float())[0].cpu()
+        batched = fp32_batch_outputs[item["batch_index"]][item["batch_position"]]
+        fp32_batch.append(batched)
+        fp32_single.append(single)
+        fp32_samples.append(item["identity"]["record"]["sample_id"])
+    fp32_metrics = feature_similarity_metrics(
+        torch.stack(fp32_batch), torch.stack(fp32_single)
+    )
+
+    fp32_weight_autocast_batched = []
+    for batch_index in batch_indices:
+        batch = pending[
+            batch_index * args.cache_batch_size : (batch_index + 1) * args.cache_batch_size
+        ]
+        pixels = torch.stack(
+            [
+                render_record_to_pixel_values(args.dataset_root, identity["record"]).pixel_values
+                for _key, identity in batch
+            ]
+        ).to(device)
+        with torch.autocast(device_type="cuda", dtype=torch.float16):
+            fp32_weight_autocast_batched.append(fp32_encoder(pixels).half().cpu())
+    fp32_weight_autocast_single = []
+    for item in selected:
+        with torch.autocast(device_type="cuda", dtype=torch.float16):
+            fp32_weight_autocast_single.append(
+                fp32_encoder(item["pixels"].unsqueeze(0).to(device))[0].half().cpu()
+            )
+    fp32_weight_autocast_metrics = feature_similarity_metrics(
+        torch.cat(fp32_weight_autocast_batched),
+        torch.stack(fp32_weight_autocast_single),
+    )
+
+    fp32_encoder.cpu()
+    torch.cuda.empty_cache()
+
+    bridge = ImageQFormerBridge()
+    initialize_image_bridge_from_instructblip(bridge, args.instructblip_checkpoint)
+    bridge.requires_grad_(False).to(device).eval()
+    tokenizer = build_xinstruct_qformer_tokenizer(args.qformer_tokenizer)
+    projected_cached = []
+    projected_online = []
+    for start in range(0, len(selected), 4):
+        group = selected[start : start + 4]
+        cached = torch.stack([item["cached"] for item in group]).to(device)
+        online = online_selected[start : start + len(group)].to(device)
+        questions = [item["identity"]["record"]["question"] for item in group]
+        tokens = tokenizer(
+            questions,
+            padding="longest",
+            truncation=True,
+            max_length=128,
+            return_tensors="pt",
+        )
+        mask = torch.ones(cached.shape[:2], dtype=torch.long, device=device)
+        with torch.autocast(device_type="cuda", dtype=torch.float16):
+            cached_output = bridge(
+                cached,
+                mask,
+                tokens.input_ids.to(device),
+                tokens.attention_mask.to(device),
+            ).projected_features.half().cpu()
+            online_output = bridge(
+                online,
+                mask,
+                tokens.input_ids.to(device),
+                tokens.attention_mask.to(device),
+            ).projected_features.half().cpu()
+        projected_cached.append(cached_output)
+        projected_online.append(online_output)
+    downstream_metrics = feature_similarity_metrics(
+        torch.cat(projected_cached), torch.cat(projected_online)
+    )
+    downstream_passed = feature_similarity_passes(downstream_metrics)
+
+    relation_types = sorted(
+        {item["identity"]["record"]["relation_raw"] for item in selected}
+    )
+    report = {
+        "passed": cross_batch_passed and downstream_passed,
+        "cache_reused": None,
+        "encoder_eval": not visual_encoder.training,
+        "encoder_trainable_parameters": sum(
+            parameter.numel()
+            for parameter in visual_encoder.parameters()
+            if parameter.requires_grad
+        ),
+        "execution_context": "torch.inference_mode",
+        "cache_generation": {
+            "unique_feature_count": len(pending),
+            "batch_size": args.cache_batch_size,
+            "batch_count": math.ceil(len(pending) / args.cache_batch_size),
+            "last_batch_size": len(pending) % args.cache_batch_size or args.cache_batch_size,
+            "order_sha256": canonical_sha256([key for key, _item in pending]),
+            "forward_precision": args.cache_forward_precision,
+            "storage_dtype": "torch.float16",
+        },
+        "strict_data_mapping": {
+            "all_feature_artifacts_checked": len(pending),
+            "diagnostic_jpeg_hashes_checked": len(selected),
+            "selected_batch_indices": batch_indices,
+            "selected_samples": len(selected),
+            "relation_types": relation_types,
+            "shape": list(cached_selected.shape[1:]),
+            "dtype": str(cached_selected.dtype),
+            "attention_mask": f"all_ones_length_{cached_selected.shape[1]}",
+        },
+        "same_batch_cache_precision_replay": {
+            "passed": True,
+            "aggregate": same_metrics,
+            "batches": same_batch_rows,
+        },
+        "batch1_vs_batch8_cache_precision": {
+            "passed": cross_batch_passed,
+            "precision": args.cache_forward_precision,
+            "thresholds": PIXEL_FEATURE_THRESHOLDS,
+            "metrics": cross_batch_metrics,
+        },
+        "batch1_vs_batch8_fp32": {
+            "diagnostic_only": True,
+            "checkpoint_load": {
+                "shape_mismatch": fp32_audit["shape_mismatch"],
+                "official_mixed_fp16_conversion": fp32_audit[
+                    "official_mixed_fp16_conversion"
+                ],
+            },
+            "sample_ids": fp32_samples,
+            "metrics": fp32_metrics,
+        },
+        "batch1_vs_batch8_fp16_autocast_with_fp32_weights": {
+            "diagnostic_only": True,
+            "passed": feature_similarity_passes(fp32_weight_autocast_metrics),
+            "thresholds": PIXEL_FEATURE_THRESHOLDS,
+            "metrics": fp32_weight_autocast_metrics,
+        },
+        "image_bridge_downstream": {
+            "passed": downstream_passed,
+            "metrics": downstream_metrics,
+        },
+    }
+    del bridge, fp32_encoder, fp32_batch_outputs
+    gc.collect()
+    torch.cuda.empty_cache()
+    return report
 
 
 @torch.no_grad()
@@ -418,13 +766,18 @@ def build_or_validate_cache(
     eva_sha256 = sha256_file(args.eva_checkpoint)
     rows, identities = prepare_cache_rows(args, records, eva_sha256)
     expected = expected_cache_metadata(args, rows, identities, eva_sha256)
-    reusable, reuse_audit = cache_is_reusable(args, expected, rows)
+    reusable, reuse_audit = cache_is_reusable(args, expected, rows, identities)
     feature_shape = None
     if reusable:
         feature_shape = json.loads(
             (args.cache_root / "cache_metadata.json").read_text(encoding="utf-8")
         )["feature_shape"]
         print("pixel cache: exact reusable cache verified", flush=True)
+    elif (args.cache_root / "cache_metadata.json").exists():
+        raise RuntimeError(
+            f"Existing Pixel cache failed strict data/mapping integrity; refusing rebuild: "
+            f"{reuse_audit}"
+        )
     else:
         print(f"pixel cache: rebuilding ({reuse_audit})", flush=True)
         args.cache_root.mkdir(parents=True, exist_ok=True)
@@ -436,8 +789,9 @@ def build_or_validate_cache(
                 for _key, item in batch
             ]
             pixels = torch.stack([item.pixel_values for item in marked]).to(device)
-            with torch.autocast(device_type="cuda", dtype=torch.float16):
-                features = visual_encoder(pixels).half().cpu()
+            features = _cache_precision_forward(
+                visual_encoder, pixels, args.cache_forward_precision
+            ).cpu()
             if not bool(torch.isfinite(features).all().item()):
                 raise FloatingPointError("Non-finite EVA cache feature")
             if feature_shape is None:
@@ -454,6 +808,9 @@ def build_or_validate_cache(
                     "dtype": "torch.float16",
                     "representative_sample_id": identity["record"]["sample_id"],
                     "identity_payload": identity["payload"],
+                    "generation_batch_index": start // args.cache_batch_size,
+                    "generation_batch_position": position,
+                    "generation_batch_size": len(batch),
                     "processed_jpeg_sha256": hashlib.sha256(
                         marked_input.jpeg_bytes.to(torch.uint8).numpy().tobytes()
                     ).hexdigest(),
@@ -472,12 +829,31 @@ def build_or_validate_cache(
             "created_at": now_iso(),
         }
         write_json(args.cache_root / "cache_metadata.json", metadata)
-    audit = online_cache_checks(args, visual_encoder, rows, records, device)
+    audit = controlled_cache_diagnostics(
+        args, visual_encoder, identities, eva_sha256, device
+    )
+    audit["cache_reused"] = reusable
+    metadata_path = args.cache_root / "cache_metadata.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata["generation"] = audit["cache_generation"]
+    metadata["validation"] = {
+        "validated_at": now_iso(),
+        "method": "strict_discrete_same_batch_replay_and_controlled_numeric_similarity",
+        "report_path": str((args.output_dir / "cache_diagnostic.json").resolve()),
+        "thresholds": PIXEL_FEATURE_THRESHOLDS,
+    }
+    write_json(metadata_path, metadata)
+    write_json(args.output_dir / "cache_diagnostic.json", audit)
+    if not audit["passed"]:
+        raise RuntimeError(
+            "Controlled Pixel cache diagnostics did not meet the predeclared "
+            "floating-point or downstream thresholds; training is blocked"
+        )
     report = {
         "reused": reusable,
         "reuse_audit": reuse_audit,
         "metadata": {**expected, "feature_shape": feature_shape},
-        "online_checks": audit,
+        "controlled_diagnostics": audit,
         "manifest_paths": {
             split: str((args.cache_root / f"{split}.jsonl").resolve())
             for split in ("train", "valid")
@@ -579,6 +955,8 @@ def fixed_training_config(args: argparse.Namespace) -> dict[str, Any]:
         "micro_batch_size": 1,
         "gradient_accumulation": args.gradient_accumulation,
         "precision": "FP16 autocast with GradScaler",
+        "eva_cache_forward_precision": args.cache_forward_precision,
+        "eva_cache_storage_dtype": "torch.float16",
         "grad_scaler_init_scale": 1024.0,
         "grad_scaler_growth_interval": 2000,
         "max_epochs": args.max_epochs,
@@ -1082,6 +1460,19 @@ def render_report(report: dict[str, Any], path: Path) -> None:
 
 Frozen EVA-CLIP-G cached features → trainable official InstructBLIP Image Q-Former/Query Tokens/visual LayerNorm/projector → frozen Vicuna-7B-v1.1. SpatialSense test was not read.
 
+## Attempt history
+
+Attempt 1 stopped before training because the original audit incorrectly required
+bitwise equality between FP16 EVA outputs produced with cache batch size 8 and
+online batch size 1. Its evidence is preserved under
+`attempt_1_strict_cache_check_failure/`. Attempt 2 keeps strict equality for all
+discrete mapping and input identity fields, requires exact same-batch replay, and
+uses the predeclared mean-error, relative-L2, and per-sample cosine thresholds
+only for controlled cross-batch floating-point comparison. Controlled diagnosis
+also found that the official mixed-FP16 path missed the fixed per-sample cosine
+threshold, while FP32 batch-size replay was stable; therefore the cache was
+regenerated with FP32 EVA forward passes and stored as FP16.
+
 ## Stop
 
 Epoch **{report['stop_epoch']}**, reason `{report['stop_reason']}`; best epoch **{report['best_epoch']}**.
@@ -1146,7 +1537,10 @@ def run_autonomous(
     ):
         raise RuntimeError("Existing formal artifacts require --resume; refusing to overwrite")
     update_status(status_path, status, state="loading_eva_for_cache")
-    eva, eva_audit = build_official_eva_vit_g(args.eva_checkpoint)
+    eva, eva_audit = build_official_eva_vit_g(
+        args.eva_checkpoint,
+        mixed_fp16=args.cache_forward_precision == "official_mixed_fp16",
+    )
     eva.to(device).eval()
     update_status(status_path, status, state="cache_check_or_build")
     cache_report, _rows = build_or_validate_cache(args, eva, device, sys.stdout)
@@ -1468,7 +1862,13 @@ def main() -> int:
         "exit_code": None,
         "git_commit": git["commit"],
         "git_branch": git["branch"],
-        "mode": "smoke_only" if args.smoke_only else "autonomous_training",
+        "mode": (
+            "smoke_only"
+            if args.smoke_only
+            else "cache_diagnostic_only"
+            if args.cache_diagnostic_only
+            else "autonomous_training"
+        ),
     }
     write_json(status_path, status)
     termination_state = {"requested": False}
@@ -1487,6 +1887,27 @@ def main() -> int:
         del cuda_probe
         update_status(status_path, status, state="cuda_initialized")
         set_seed(args.seed)
+        if args.cache_diagnostic_only:
+            update_status(status_path, status, state="cache_diagnostic_running")
+            eva, _eva_audit = build_official_eva_vit_g(
+                args.eva_checkpoint,
+                mixed_fp16=args.cache_forward_precision == "official_mixed_fp16",
+            )
+            eva.to(device).eval()
+            report, _rows = build_or_validate_cache(args, eva, device, sys.stdout)
+            update_status(
+                status_path,
+                status,
+                state="cache_diagnostic_passed",
+                end_time=now_iso(),
+                stop_reason="cache_diagnostic_only_complete",
+                exit_code=0,
+            )
+            metrics = report["controlled_diagnostics"][
+                "batch1_vs_batch8_cache_precision"
+            ]["metrics"]
+            print(json.dumps({"cache_diagnostic": "passed", "metrics": metrics}), flush=True)
+            return 0
         if args.smoke_only:
             update_status(status_path, status, state="smoke_running")
             smoke = run_smoke(args, device)

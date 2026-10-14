@@ -18,6 +18,11 @@ from .models import PixelVicuna
 
 
 PIXEL_CACHE_VERSION = 1
+PIXEL_FEATURE_THRESHOLDS = {
+    "mean_abs_error": 0.01,
+    "relative_l2_error": 0.02,
+    "minimum_sample_cosine_similarity": 0.999,
+}
 
 
 def canonical_sha256(value: Any) -> str:
@@ -28,7 +33,11 @@ def canonical_sha256(value: Any) -> str:
 
 
 def pixel_visual_cache_identity(
-    record: Mapping[str, Any], *, raw_image_sha256: str, eva_checkpoint_sha256: str
+    record: Mapping[str, Any],
+    *,
+    raw_image_sha256: str,
+    eva_checkpoint_sha256: str,
+    cache_forward_precision: str = "official_mixed_fp16",
 ) -> tuple[str, dict[str, Any]]:
     payload = {
         "cache_version": PIXEL_CACHE_VERSION,
@@ -43,9 +52,107 @@ def pixel_visual_cache_identity(
             "std": list(BLIP_IMAGE_STD),
         },
         "eva_checkpoint_sha256": eva_checkpoint_sha256,
+        "cache_forward_precision": cache_forward_precision,
         "feature_location": "EVA-CLIP-G final token sequence before InstructBLIP ln_vision",
     }
     return canonical_sha256(payload), payload
+
+
+def validate_discrete_cache_contract(
+    observed: Mapping[str, Any], expected: Mapping[str, Any]
+) -> None:
+    """Require exact equality for non-floating cache identity and mapping fields."""
+
+    mismatches = [
+        key for key, value in expected.items() if key not in observed or observed[key] != value
+    ]
+    if mismatches:
+        raise RuntimeError(f"Discrete Pixel cache contract mismatch: {mismatches}")
+
+
+def require_frozen_eval(module: torch.nn.Module) -> None:
+    """Fail closed if a cache-producing encoder is stochastic or trainable."""
+
+    if module.training:
+        raise RuntimeError("Cache-producing EVA must be in eval mode")
+    trainable = [name for name, parameter in module.named_parameters() if parameter.requires_grad]
+    if trainable:
+        raise RuntimeError(f"Cache-producing EVA has trainable parameters: {trainable[:3]}")
+
+
+def feature_similarity_metrics(
+    reference: torch.Tensor,
+    candidate: torch.Tensor,
+    *,
+    large_error_threshold: float = 0.1,
+) -> dict[str, Any]:
+    """Measure controlled floating-point similarity without hiding outliers."""
+
+    if reference.shape != candidate.shape:
+        raise ValueError(f"Feature shapes differ: {reference.shape} != {candidate.shape}")
+    if reference.ndim < 2:
+        raise ValueError("Feature similarity requires a batch dimension")
+    reference_float = reference.detach().float()
+    candidate_float = candidate.detach().float()
+    finite = bool(
+        torch.isfinite(reference_float).all().item()
+        and torch.isfinite(candidate_float).all().item()
+    )
+    if not finite:
+        return {
+            "all_finite": False,
+            "torch_equal": bool(torch.equal(reference, candidate)),
+            "max_abs_error": float("inf"),
+            "mean_abs_error": float("inf"),
+            "relative_l2_error": float("inf"),
+            "sample_cosine_similarity": [],
+            "minimum_sample_cosine_similarity": float("-inf"),
+            "mean_sample_cosine_similarity": float("nan"),
+            "reference_abs_max": float("inf"),
+            "candidate_abs_max": float("inf"),
+            "large_error_threshold": large_error_threshold,
+            "large_error_count": reference.numel(),
+            "large_error_fraction": 1.0,
+        }
+    difference = (candidate_float - reference_float).abs()
+    flat_reference = reference_float.reshape(reference.shape[0], -1)
+    flat_candidate = candidate_float.reshape(candidate.shape[0], -1)
+    cosines = torch.nn.functional.cosine_similarity(
+        flat_reference, flat_candidate, dim=1, eps=1e-12
+    )
+    relative_l2 = torch.linalg.vector_norm(candidate_float - reference_float) / torch.clamp(
+        torch.linalg.vector_norm(reference_float), min=1e-12
+    )
+    large_count = int(difference.gt(large_error_threshold).sum().item())
+    cosine_values = [float(value) for value in cosines.cpu().tolist()]
+    return {
+        "all_finite": True,
+        "torch_equal": bool(torch.equal(reference, candidate)),
+        "max_abs_error": float(difference.max().item()),
+        "mean_abs_error": float(difference.mean().item()),
+        "relative_l2_error": float(relative_l2.item()),
+        "sample_cosine_similarity": cosine_values,
+        "minimum_sample_cosine_similarity": min(cosine_values),
+        "mean_sample_cosine_similarity": float(sum(cosine_values) / len(cosine_values)),
+        "reference_abs_max": float(reference_float.abs().max().item()),
+        "candidate_abs_max": float(candidate_float.abs().max().item()),
+        "large_error_threshold": large_error_threshold,
+        "large_error_count": large_count,
+        "large_error_fraction": large_count / reference.numel(),
+    }
+
+
+def feature_similarity_passes(
+    metrics: Mapping[str, Any],
+    thresholds: Mapping[str, float] = PIXEL_FEATURE_THRESHOLDS,
+) -> bool:
+    return bool(
+        metrics["all_finite"]
+        and metrics["mean_abs_error"] <= thresholds["mean_abs_error"]
+        and metrics["relative_l2_error"] <= thresholds["relative_l2_error"]
+        and metrics["minimum_sample_cosine_similarity"]
+        >= thresholds["minimum_sample_cosine_similarity"]
+    )
 
 
 class SpatialSensePixelCachedDataset(Dataset[dict[str, Any]]):
