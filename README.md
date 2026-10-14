@@ -1,5 +1,10 @@
 # Spacebyte
 
+> [!IMPORTANT]
+> 当前 Byte-only 研究状态、最终指标、checkpoint、复现命令以及下一阶段边界，以
+> [`BYTE_BRANCH_HANDOFF.md`](BYTE_BRANCH_HANDOFF.md) 为权威交接。后续 AI 开始
+> Byte/Pixel/VLM 相关开发前必须先阅读该文档。
+
 本分支提供 Apple 官方预训练 ByteFormer 基线的严格加载与前向验证。当前模型是
 ImageNet JPEG Q100、卷积核 `k=8`、窗口大小 `w=128` 的 ByteFormer-Tiny，保留官方
 `Linear(192, 1000)` ImageNet 分类头；不加载 SpatialSense 九分类微调权重。
