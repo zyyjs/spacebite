@@ -74,15 +74,27 @@ def binary_classification_metrics(
     precision = tp / (tp + fp) if tp + fp else 0.0
     recall = tp / (tp + fn) if tp + fn else 0.0
     specificity = tn / (tn + fp) if tn + fp else 0.0
+    positive_f1 = (
+        2 * precision * recall / (precision + recall)
+        if precision + recall
+        else 0.0
+    )
+    negative_precision = tn / (tn + fn) if tn + fn else 0.0
+    negative_recall = specificity
+    negative_f1 = (
+        2 * negative_precision * negative_recall
+        / (negative_precision + negative_recall)
+        if negative_precision + negative_recall
+        else 0.0
+    )
     return {
         "sample_count": len(labels),
         "accuracy": (tp + tn) / len(labels),
         "balanced_accuracy": (recall + specificity) / 2,
         "precision": precision,
         "recall": recall,
-        "f1": 2 * precision * recall / (precision + recall)
-        if precision + recall
-        else 0.0,
+        "f1": positive_f1,
+        "macro_f1": (positive_f1 + negative_f1) / 2,
         "auroc": auroc(labels, scores),
         "confusion_matrix": {"tn": tn, "fp": fp, "fn": fn, "tp": tp},
     }

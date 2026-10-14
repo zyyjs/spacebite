@@ -237,15 +237,22 @@ class ByteVicuna(nn.Module):
         byte_tensor: Tensor,
         questions: str | Sequence[str],
     ) -> tuple[ByteQFormerBridgeOutput, Tensor, Tensor]:
-        """Encode JPEG bytes while retaining gradients only through the bridge."""
+        """Encode JPEG bytes, retaining ByteFormer gradients when it is trainable."""
 
         if byte_tensor.device != self.device:
             raise ValueError("byte_tensor and Byte Q-Former must be on the same device")
         batch_size = byte_tensor.shape[0]
         question_batch = self._normalize_text_batch(questions, batch_size, "questions")
         instruction_ids, instruction_mask = self._qformer_tokens(question_batch)
-        with torch.no_grad():
+        byteformer_is_trainable = any(
+            parameter.requires_grad
+            for parameter in self.byteformer_adapter.parameters()
+        )
+        if byteformer_is_trainable:
             byte_features, byte_mask = self.byteformer_adapter(byte_tensor)
+        else:
+            with torch.no_grad():
+                byte_features, byte_mask = self.byteformer_adapter(byte_tensor)
         bridge_output = self.bridge(
             encoder_hidden_states=byte_features,
             encoder_attention_mask=byte_mask,

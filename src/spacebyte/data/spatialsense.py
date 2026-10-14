@@ -194,8 +194,15 @@ def _validated_bbox(value: Any, *, sample_id: str, role: str) -> list[float]:
     return result
 
 
-def flatten_spatialsense_annotations(dataset_root: Path) -> list[dict[str, Any]]:
+def flatten_spatialsense_annotations(
+    dataset_root: Path, *, include_splits: set[str] | None = None
+) -> list[dict[str, Any]]:
     """Return one record per annotated candidate relation."""
+
+    if include_splits is not None:
+        unknown = include_splits - {"train", "valid", "test"}
+        if unknown:
+            raise ValueError(f"Unsupported SpatialSense splits: {sorted(unknown)}")
 
     annotation_path = dataset_root / "annotations.json"
     image_records = load_json(annotation_path)
@@ -210,6 +217,8 @@ def flatten_spatialsense_annotations(dataset_root: Path) -> list[dict[str, Any]]
         split = image_record["split"]
         if split not in {"train", "valid", "test"}:
             raise ValueError(f"Unexpected SpatialSense split: {split!r}")
+        if include_splits is not None and split not in include_splits:
+            continue
         relative_image = resolve_image_path(dataset_root, image_record["url"]).relative_to(
             dataset_root
         )
