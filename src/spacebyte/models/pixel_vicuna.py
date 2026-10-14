@@ -500,6 +500,68 @@ class PixelVicuna(ByteVicuna):
                 raise RuntimeError("ignored + supervised labels must equal labels.numel()")
         return self._as_pixel_inputs(base, pixel_values)
 
+    def prepare_inputs_from_vision_features(
+        self,
+        vision_features: Tensor,
+        vision_attention_mask: Tensor,
+        questions: str | Sequence[str],
+        answers: str | Sequence[str] | None = None,
+        *,
+        pixel_condition: str = "normal",
+        projected_query_scale: float = 1.0,
+        extra_text_padding: int = 0,
+        answer_only_loss: bool = False,
+    ) -> PixelVicunaInputs:
+        """Build Vicuna inputs from audited frozen-EVA cache tensors."""
+
+        if pixel_condition not in {"normal", "zero"}:
+            raise ValueError(
+                "Cached Shuffled-Pixel must be implemented by global dataset mapping"
+            )
+        if (
+            vision_features.ndim != 3
+            or vision_features.shape[-1] != self.bridge.encoder_width
+        ):
+            raise ValueError(
+                f"vision_features must be [B,T,{self.bridge.encoder_width}]"
+            )
+        if vision_attention_mask.shape != vision_features.shape[:2]:
+            raise ValueError("vision_attention_mask must have shape [B,T]")
+        batch_size = vision_features.shape[0]
+        question_batch = self._normalize_text_batch(questions, batch_size, "questions")
+        instruction_ids, instruction_mask = self._qformer_tokens(question_batch)
+        conditioned = (
+            torch.zeros_like(vision_features)
+            if pixel_condition == "zero"
+            else vision_features
+        )
+        bridge_output = self.bridge(
+            conditioned,
+            vision_attention_mask,
+            instruction_ids,
+            instruction_mask,
+        )
+        base = self._prepare_from_bridge_output(
+            bridge_output,
+            conditioned,
+            vision_attention_mask,
+            question_batch,
+            answers,
+            projected_query_scale=projected_query_scale,
+            extra_text_padding=extra_text_padding,
+            text_padding_side="right",
+            answer_only_loss=answer_only_loss,
+        )
+        if base.labels is not None:
+            ignored = int(base.labels.eq(-100).sum().item())
+            supervised = int(base.labels.ne(-100).sum().item())
+            if ignored + supervised != base.labels.numel():
+                raise RuntimeError("ignored + supervised labels must equal labels.numel()")
+        # Cached execution has no live RGB tensor; retain an empty, typed marker
+        # rather than fabricating pixels that never entered the model.
+        pixel_marker = vision_features.new_empty((batch_size, 0, 0, 0))
+        return self._as_pixel_inputs(base, pixel_marker)
+
     def forward(
         self,
         pixel_values: Tensor,
@@ -508,6 +570,32 @@ class PixelVicuna(ByteVicuna):
         **kwargs,
     ) -> PixelVicunaOutput:
         prepared = self.prepare_inputs(pixel_values, questions, answers, **kwargs)
+        outputs = self.vicuna(
+            inputs_embeds=prepared.vicuna_inputs_embeds,
+            attention_mask=prepared.vicuna_attention_mask,
+            labels=prepared.labels,
+            use_cache=False,
+            return_dict=True,
+        )
+        return PixelVicunaOutput(outputs.loss, outputs.logits, prepared)
+
+    def forward_from_vision_features(
+        self,
+        vision_features: Tensor,
+        vision_attention_mask: Tensor,
+        questions: str | Sequence[str],
+        answers: str | Sequence[str],
+        **kwargs,
+    ) -> PixelVicunaOutput:
+        """Differentiable answer-loss path over frozen-EVA cached features."""
+
+        prepared = self.prepare_inputs_from_vision_features(
+            vision_features,
+            vision_attention_mask,
+            questions,
+            answers,
+            **kwargs,
+        )
         outputs = self.vicuna(
             inputs_embeds=prepared.vicuna_inputs_embeds,
             attention_mask=prepared.vicuna_attention_mask,

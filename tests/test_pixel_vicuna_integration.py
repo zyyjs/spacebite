@@ -47,6 +47,7 @@ class TinyVision(nn.Module):
 class TinyImageBridge(nn.Module):
     def __init__(self, hidden_size=16) -> None:
         super().__init__()
+        self.encoder_width = 8
         self.vision_layernorm = nn.LayerNorm(8)
         self.query_tokens = nn.Parameter(torch.randn(1, 4, 6))
         self.qformer = nn.ModuleDict(
@@ -198,6 +199,35 @@ def test_trainable_checkpoint_roundtrip_is_strict(tmp_path: Path) -> None:
     assert result.unexpected_keys == []
     for key, value in source.state_dict().items():
         assert torch.equal(value, target.state_dict()[key])
+
+
+def test_cached_eva_feature_path_preserves_answer_only_protocol() -> None:
+    model = tiny_model().eval()
+    features = torch.randn(2, 5, 8)
+    mask = torch.ones(2, 5, dtype=torch.long)
+    output = model.forward_from_vision_features(
+        features,
+        mask,
+        ["Where?", "Where?"],
+        ["yes", "no"],
+        answer_only_loss=True,
+    )
+    audit = audit_answer_only_labels(
+        output.prepared, ["yes", "no"], model.llm_tokenizer
+    )
+    assert output.prepared.pixel_values.shape == (2, 0, 0, 0)
+    assert torch.equal(output.prepared.vision_features, features)
+    assert audit["supervised_token_count"] == 2
+    with torch.no_grad():
+        zero = model.forward_from_vision_features(
+            features,
+            mask,
+            ["Where?", "Where?"],
+            ["yes", "no"],
+            answer_only_loss=True,
+            pixel_condition="zero",
+        )
+    assert not torch.equal(output.logits, zero.logits)
 
 
 def test_official_image_bridge_dimensions() -> None:
