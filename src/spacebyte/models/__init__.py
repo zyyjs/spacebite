@@ -30,6 +30,17 @@ from .byte_vicuna import (
     load_frozen_vicuna,
     scale_projected_queries,
 )
+from .pixel_vicuna import (
+    EVA_CHECKPOINT_URL,
+    INSTRUCTBLIP_CHECKPOINT_URL,
+    ImageQFormerBridge,
+    PixelVicuna,
+    PixelVicunaInputs,
+    PixelVicunaOutput,
+    build_official_eva_vit_g,
+    initialize_image_bridge_from_instructblip,
+    parameter_summary,
+)
 
 __all__ = [
     "ByteFormerTokenAdapter",
@@ -54,4 +65,13 @@ __all__ = [
     "inspect_blip2_qformer_checkpoint",
     "load_frozen_vicuna",
     "scale_projected_queries",
+    "EVA_CHECKPOINT_URL",
+    "INSTRUCTBLIP_CHECKPOINT_URL",
+    "ImageQFormerBridge",
+    "PixelVicuna",
+    "PixelVicunaInputs",
+    "PixelVicunaOutput",
+    "build_official_eva_vit_g",
+    "initialize_image_bridge_from_instructblip",
+    "parameter_summary",
 ]

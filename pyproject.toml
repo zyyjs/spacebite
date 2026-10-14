@@ -8,6 +8,9 @@ version = "0.1.0"
 description = "Official pretrained ByteFormer baseline utilities"
 requires-python = ">=3.10"
 
+[project.optional-dependencies]
+pixel = ["timm==0.4.12"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

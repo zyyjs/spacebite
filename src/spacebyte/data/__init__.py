@@ -1,9 +1,11 @@
 """Dataset and preprocessing utilities owned by SpaceByte."""
 
 from .spatialsense import (
+    OBJECT_COLOR,
     NORMALIZED_RELATIONS,
     PREPROCESS_VERSION,
     RAW_RELATIONS,
+    SUBJECT_COLOR,
     SpatialSenseCachedFeatureDataset,
     SpatialSenseFullCachedDataset,
     VISUAL_PREPROCESS_CONFIG,
@@ -16,16 +18,27 @@ from .spatialsense import (
     normalize_relation,
     parse_binary_answer,
     render_marked_image,
+    render_record_to_jpeg_bytes,
     resolve_image_path,
     sha256_file,
     validate_feature_cache_file,
     visual_cache_identity,
 )
+from .pixel import (
+    BLIP_IMAGE_MEAN,
+    BLIP_IMAGE_STD,
+    MarkedPixelInput,
+    decode_marked_jpeg_to_pixel_values,
+    fixed_derangement,
+    render_record_to_pixel_values,
+)
 
 __all__ = [
     "NORMALIZED_RELATIONS",
+    "OBJECT_COLOR",
     "PREPROCESS_VERSION",
     "RAW_RELATIONS",
+    "SUBJECT_COLOR",
     "SpatialSenseCachedFeatureDataset",
     "SpatialSenseFullCachedDataset",
     "VISUAL_PREPROCESS_CONFIG",
@@ -38,8 +51,15 @@ __all__ = [
     "normalize_relation",
     "parse_binary_answer",
     "render_marked_image",
+    "render_record_to_jpeg_bytes",
     "resolve_image_path",
     "sha256_file",
     "validate_feature_cache_file",
     "visual_cache_identity",
+    "BLIP_IMAGE_MEAN",
+    "BLIP_IMAGE_STD",
+    "MarkedPixelInput",
+    "decode_marked_jpeg_to_pixel_values",
+    "fixed_derangement",
+    "render_record_to_pixel_values",
 ]
