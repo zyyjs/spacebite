@@ -4,6 +4,7 @@ set -euo pipefail
 task_root="/home/Zhang_jinsong/spacebyte"
 task_result="/data/students/Zhang_jinsong/spacebyte/result/pixel/spatialsense_pixel_baseline"
 task_python="/data/students/Zhang_jinsong/spacebyte/envs/spacebyte-qformer/bin/python"
+task_device="${SPACEBYTE_DEVICE:-cuda:2}"
 
 mkdir -p "${task_result}"
 if [[ -f "${task_result}/run.pid" ]]; then
@@ -16,7 +17,7 @@ fi
 
 cd "${task_root}"
 nohup setsid "${task_python}" -u scripts/run_spatialsense_pixel_baseline_autonomous.py \
-  --device cuda:2 \
+  --device "${task_device}" \
   >"${task_result}/train.log" 2>&1 < /dev/null &
 task_pid=$!
 printf '%s\n' "${task_pid}" > "${task_result}/run.pid"
