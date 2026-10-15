@@ -41,6 +41,13 @@ from .pixel_vicuna import (
     initialize_image_bridge_from_instructblip,
     parameter_summary,
 )
+from .dual_branch_vicuna import (
+    DUAL_CONDITIONS,
+    DualBranchInputs,
+    DualBranchOutput,
+    DualBranchVicuna,
+    dual_parameter_summary,
+)
 
 __all__ = [
     "ByteFormerTokenAdapter",
@@ -74,4 +81,9 @@ __all__ = [
     "build_official_eva_vit_g",
     "initialize_image_bridge_from_instructblip",
     "parameter_summary",
+    "DUAL_CONDITIONS",
+    "DualBranchInputs",
+    "DualBranchOutput",
+    "DualBranchVicuna",
+    "dual_parameter_summary",
 ]

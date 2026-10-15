@@ -100,11 +100,18 @@ def load_frozen_vicuna(
 
     resolved = Path(model_path).resolve()
     tokenizer = build_xinstruct_vicuna_tokenizer(resolved)
-    model = LlamaForCausalLM.from_pretrained(
+    model, loading_info = LlamaForCausalLM.from_pretrained(
         str(resolved),
         torch_dtype=dtype,
         local_files_only=True,
+        output_loading_info=True,
     )
+    strict_fields = ("missing_keys", "unexpected_keys", "mismatched_keys", "error_msgs")
+    loading_problems = {
+        key: list(loading_info.get(key, [])) for key in strict_fields
+    }
+    if any(loading_problems.values()):
+        raise RuntimeError(f"Vicuna checkpoint strict load failed: {loading_problems}")
     original_vocab_size = int(model.config.vocab_size)
     original_special_token_ids = {
         "bos_token_id": model.config.bos_token_id,
@@ -152,6 +159,15 @@ def load_frozen_vicuna(
         "pad_token_id": tokenizer.pad_token_id,
         "dtype": str(dtype),
         "all_parameters_frozen": not any(p.requires_grad for p in model.parameters()),
+        "checkpoint_load": {
+            "strict": True,
+            **loading_problems,
+            "loaded_tensor_count": len(model.state_dict()),
+            "loaded_parameter_elements_before_pad_resize": sum(
+                int(parameter.numel()) for parameter in model.parameters()
+            )
+            - int(model.config.hidden_size),
+        },
     }
     return model, tokenizer, report
 
