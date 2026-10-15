@@ -618,6 +618,9 @@ def run(args: argparse.Namespace, status: dict[str, Any], status_path: Path) -> 
         "free_gib": free / GB,
         "total_gib": total / GB,
     }
+    # Establish the audited device context before lengthy checkpoint hashing so
+    # the one-shot launcher health check can prove this exact PID owns GPU 1.
+    startup_cuda_sentinel = torch.empty(1, device=device)
 
     update_status(status_path, status, phase="select_real_samples")
     # The loader is explicitly restricted at source, so test annotations are
@@ -646,6 +649,7 @@ def run(args: argparse.Namespace, status: dict[str, Any], status_path: Path) -> 
     update_status(status_path, status, phase="checkpoint_audit_and_model_load")
     torch.cuda.reset_peak_memory_stats(device)
     model, loading = load_models(args, device)
+    del startup_cuda_sentinel
     loaded_memory = torch.cuda.max_memory_allocated(device) / GB
     before = snapshot_parameters(model)
 
